@@ -1,15 +1,28 @@
-.app {
-  max-width: 900px;
-  margin: 2rem auto;
-  padding: 0 1rem;
-  font-family: system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
-  color: #1f2933;
+html,
+body,
+#root {
+  height: 100%;
 }
+
+body {
+  margin: 0;
+  background: #f9fafb;
+  display: flex;
+  justify-content: center;   /* horizontal zentrieren */
+  align-items: flex-start;   /* oder 'center', wenn du auch vertikal mittig willst */
+}
+
+.app {
+  width: 100%;
+  max-width: 1000px;
+  margin: 2rem 0 3rem;       /* oben/unten etwas Abstand, seitlich kein auto mehr nötig */
+}
+
 
 h1 {
   text-align: center;
-  margin-bottom: 2rem;
-  color: #1f2937;
+  margin-bottom: 1.5rem;
+  font-size: 1.8rem;
 }
 
 .card {
@@ -17,7 +30,19 @@ h1 {
   border-radius: 12px;
   padding: 1.5rem 1.75rem;
   margin-bottom: 1.5rem;
-  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.05);
+  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06);
+}
+
+/* Grid für Wetter + Tasks */
+.dashboard-grid {
+  display: grid;
+  gap: 1.25rem;
+}
+
+@media (min-width: 880px) {
+  .dashboard-grid {
+    grid-template-columns: 1.1fr 1.2fr;
+  }
 }
 
 .row {
@@ -32,33 +57,134 @@ input {
   padding: 0.5rem 0.75rem;
   border-radius: 6px;
   border: 1px solid #d1d5db;
+  font-size: 0.95rem;
 }
 
 button {
-  padding: 0.45rem 0.9rem;
+  padding: 0.5rem 0.9rem;
   border-radius: 6px;
   border: none;
   background: #2563eb;
   color: white;
   font-weight: 500;
   cursor: pointer;
+  font-size: 0.9rem;
 }
 
 button:hover {
   background: #1d4ed8;
 }
 
-.task-item {
-  display: grid;
-  grid-template-columns: 1fr auto auto;
-  gap: 0.5rem;
-  align-items: center;
-  padding: 0.35rem 0;
-  border-bottom: 1px solid #f3f4f6;
+.error {
+  color: #b91c1c;
+  margin-top: 0.25rem;
 }
 
-.task-item select {
-  padding: 0.35rem 0.4rem;
+.muted {
+  color: #6b7280;
+}
+
+/* Wetter-Infos */
+.weather-info {
+  margin-top: 0.5rem;
+}
+
+.weather-temp {
+  font-size: 2rem;
+  font-weight: 600;
+  margin: 0.1rem 0;
+}
+
+.weather-desc {
+  text-transform: capitalize;
+  color: #4b5563;
+}
+
+/* KPI-Bar oben */
+.kpi-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+  margin-bottom: 1rem;
+}
+
+.kpi-card {
+  background: #ffffff;
+  border-radius: 10px;
+  padding: 0.6rem 0.75rem;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+}
+
+.kpi-label {
+  font-size: 0.7rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #6b7280;
+}
+
+.kpi-value {
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+
+/* verschiedene KPI-Farben */
+.kpi-new .kpi-value {
+  color: #3b82f6;
+}
+.kpi-progress .kpi-value {
+  color: #f59e0b;
+}
+.kpi-done .kpi-value {
+  color: #22c55e;
+}
+
+/* Tasks */
+.task-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.task-item {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid #f3f4f6;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.task-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.task-title {
+  font-size: 0.95rem;
+}
+
+.status-pill {
+  padding: 0.15rem 0.6rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+/* Actions (Status-Select + Löschen-Button) */
+.task-actions {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.task-actions select {
+  padding: 0.3rem 0.4rem;
   border-radius: 6px;
   border: 1px solid #d1d5db;
+  font-size: 0.8rem;
 }
