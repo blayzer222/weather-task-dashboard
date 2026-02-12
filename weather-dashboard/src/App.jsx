@@ -1,144 +1,135 @@
-// React-Hooks importieren: useState für Zustände, useEffect für Logik beim Laden der Seite
 import { useEffect, useState } from "react";
-// eigene API-Funktionen für das Task-Backend
 import {
   fetchTasks,
   createTask,
   deleteTask,
   updateTaskStatus,
 } from "./api/tasksApi";
-// zentrales CSS der Anwendung
+import { login as loginRequest } from "./api/authApi";
 import "./App.css";
 
 function App() {
-  // ---------------- Wetter-Status (State) ----------------
+  // ---------------- Auth ----------------
+  const [token, setToken] = useState(localStorage.getItem("token"));
+  const [loginName, setLoginName] = useState("");
+  const [loginPassword, setLoginPassword] = useState("");
+  const [loginError, setLoginError] = useState(null);
+  const [loginLoading, setLoginLoading] = useState(false);
 
-  // aktuell ausgewählte Stadt für die Wetterabfrage
+  // ---------------- Wetter ----------------
   const [city, setCity] = useState("Berlin");
-  // Wetterdaten, die von der OpenWeatherMap-API geladen werden
   const [weather, setWeather] = useState(null);
-  // Fehlermeldung, falls beim Laden des Wetters ein Fehler auftritt
   const [weatherError, setWeatherError] = useState(null);
 
-  // ---------------- Aufgaben-Status (State) ----------------
-
-  // Liste aller Tasks, die vom Backend geladen werden
+  // ---------------- Tasks ----------------
   const [tasks, setTasks] = useState([]);
-  // Fehlermeldung für Probleme mit der Task-API
   const [tasksError, setTasksError] = useState(null);
-  // aktueller Text im Eingabefeld für eine neue Aufgabe
   const [newTaskTitle, setNewTaskTitle] = useState("");
-  // gibt an, ob die Aufgaben im Moment geladen werden (Ladeanzeige)
   const [tasksLoading, setTasksLoading] = useState(false);
 
-  // API-Key für OpenWeatherMap, aus der .env-Datei von Vite gelesen
   const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
 
-  // ---------------- Wetter von externer API laden ----------------
-
+  // ---------------- Wetter laden ----------------
   async function loadWeather() {
-    // wenn keine Stadt eingetragen ist, nichts tun
     if (!city) return;
     try {
-      // alte Fehlermeldung zurücksetzen
       setWeatherError(null);
 
-      // HTTP-Request an OpenWeatherMap senden
       const res = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=de`
       );
 
-      // wenn der Statuscode kein Erfolg ist (z. B. 404), Fehler werfen
-      if (!res.ok) {
-        throw new Error("Stadt nicht gefunden oder API-Fehler");
-      }
+      if (!res.ok) throw new Error("Stadt nicht gefunden oder API-Fehler");
 
-      // Antwort als JSON einlesen
       const data = await res.json();
-      // Wetterdaten im State speichern, damit React neu rendert
       setWeather(data);
     } catch (err) {
-      // bei Fehler: Wetterdaten löschen und Fehlermeldung anzeigen
       setWeather(null);
       setWeatherError(err.message);
     }
   }
 
-  // ---------------- Aufgabenliste aus dem Backend laden ----------------
-
+  // ---------------- Tasks laden ----------------
   async function loadTasks() {
     try {
-      // Ladeanzeige aktivieren und Fehlermeldung zurücksetzen
       setTasksLoading(true);
       setTasksError(null);
 
-      // GET-Request an /api/tasks (siehe tasksApi.js)
       const data = await fetchTasks();
-      // Aufgabenliste im State speichern
       setTasks(data);
     } catch (err) {
-      // Fehlertext im UI anzeigen
       setTasksError(err.message);
     } finally {
-      // Ladeanzeige immer deaktivieren, egal ob Erfolg oder Fehler
       setTasksLoading(false);
     }
   }
 
-  // ---------------- Initiales Laden beim Start der Seite ----------------
-
-  // useEffect ohne Abhängigkeiten-Array-Änderungen → wird genau einmal beim Mount ausgeführt
+  // ---------------- Initial: Wetter immer, Tasks nur wenn eingeloggt ----------------
   useEffect(() => {
-    loadTasks();   // Aufgaben aus dem internen Backend laden
-    loadWeather(); // erstes Wetter (Standard-Stadt Berlin) laden
-  }, []);
+    loadWeather();
+    if (token) loadTasks();
+  }, [token]);
 
-  // ---------------- Neue Aufgabe anlegen ----------------
-
-  async function handleAddTask(e) {
-    // verhindert, dass das Formular einen Seiten-Reload auslöst
+  // ---------------- Login ----------------
+  async function handleLogin(e) {
     e.preventDefault();
 
-    // leere Eingaben ignorieren
+    if (!loginName.trim() || !loginPassword) return;
+
+    try {
+      setLoginLoading(true);
+      setLoginError(null);
+
+      const data = await loginRequest(loginName.trim(), loginPassword);
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
+
+      setLoginName("");
+      setLoginPassword("");
+    } catch (err) {
+      setLoginError(err.message);
+    } finally {
+      setLoginLoading(false);
+    }
+  }
+
+  function handleLogout() {
+    localStorage.removeItem("token");
+    setToken(null);
+
+    // UI aufräumen
+    setTasks([]);
+    setTasksError(null);
+  }
+
+  // ---------------- Task anlegen ----------------
+  async function handleAddTask(e) {
+    e.preventDefault();
     if (!newTaskTitle.trim()) return;
 
     try {
-      // POST-Request an /api/tasks, Backend legt Task an
       const created = await createTask(newTaskTitle.trim());
-
-      // neue Aufgabe an bestehende Liste anhängen
       setTasks((prev) => [...prev, created]);
-
-      // Eingabefeld leeren
       setNewTaskTitle("");
     } catch (err) {
-      // Fehler bei der Kommunikation mit dem Backend anzeigen
       setTasksError(err.message);
     }
   }
 
-  // ---------------- Aufgabe löschen ----------------
-
+  // ---------------- Task löschen ----------------
   async function handleDeleteTask(id) {
     try {
-      // DELETE-Request an /api/tasks/{id}
       await deleteTask(id);
-
-      // gelöschte Aufgabe aus dem State herausfiltern
       setTasks((prev) => prev.filter((t) => t.id !== id));
     } catch (err) {
       setTasksError(err.message);
     }
   }
 
-  // ---------------- Status einer Aufgabe ändern ----------------
-
+  // ---------------- Status ändern ----------------
   async function handleStatusChange(id, newStatus) {
     try {
-      // PUT-Request an /api/tasks/{id}/status
       const updated = await updateTaskStatus(id, newStatus);
-
-      // lokale Liste aktualisieren: nur die betroffene Aufgabe bekommt den neuen Status
       setTasks((prev) =>
         prev.map((task) =>
           task.id === id ? { ...task, status: updated.status } : task
@@ -149,66 +140,95 @@ function App() {
     }
   }
 
-  // ---------------- Farbe für den jeweiligen Status bestimmen ----------------
-
+  // ---------------- Status-Farbe ----------------
   function getStatusColor(status) {
     switch (status) {
       case "IN_PROGRESS":
-        return "#f59e0b"; // orange für „in Bearbeitung“
+        return "#f59e0b";
       case "DONE":
-        return "#22c55e"; // grün für „fertig“
+        return "#22c55e";
       case "NEW":
       default:
-        return "#3b82f6"; // blau für neue Aufgaben
+        return "#3b82f6";
     }
   }
 
-  // ---------------- Kennzahlen fürs Dashboard berechnen ----------------
-
-  // Anzahl aller Tasks
+  // ---------------- KPIs ----------------
   const total = tasks.length;
-  // Anzahl der neuen Tasks (Status NEW oder kein Status gesetzt)
   const totalNew = tasks.filter((t) => (t.status || "NEW") === "NEW").length;
-  // Anzahl der Tasks mit Status IN_PROGRESS
-  const totalInProgress = tasks.filter(
-    (t) => t.status === "IN_PROGRESS"
-  ).length;
-  // Anzahl der abgeschlossenen Tasks
+  const totalInProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
   const totalDone = tasks.filter((t) => t.status === "DONE").length;
 
-  // ---------------- Render-Funktion: UI-Aufbau ----------------
-
+  // ---------------- Render ----------------
   return (
     <div className="app">
-      <h1>Weather &amp; Task Dashboard</h1>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h1>Weather &amp; Task Dashboard</h1>
 
-      {/* Kennzahlen-Leiste mit Gesamtanzahl und Verteilung nach Status */}
-      <div className="kpi-bar">
-        <div className="kpi-card">
-          <span className="kpi-label">Total Tasks</span>
-          <span className="kpi-value">{total}</span>
-        </div>
-        <div className="kpi-card kpi-new">
-          <span className="kpi-label">New</span>
-          <span className="kpi-value">{totalNew}</span>
-        </div>
-        <div className="kpi-card kpi-progress">
-          <span className="kpi-label">In Progress</span>
-          <span className="kpi-value">{totalInProgress}</span>
-        </div>
-        <div className="kpi-card kpi-done">
-          <span className="kpi-label">Done</span>
-          <span className="kpi-value">{totalDone}</span>
-        </div>
+        {token ? (
+          <button onClick={handleLogout}>Logout</button>
+        ) : (
+          <span className="muted">Nicht eingeloggt</span>
+        )}
       </div>
 
-      {/* Grid-Layout: Wetterkarte links, Aufgaben rechts (auf großen Screens) */}
+      {/* Login-Panel (nur wenn kein Token vorhanden) */}
+      {!token && (
+        <section className="card" style={{ marginBottom: 16 }}>
+          <h2>Login</h2>
+          <form onSubmit={handleLogin} className="row">
+            <input
+              type="text"
+              placeholder="Login"
+              value={loginName}
+              onChange={(e) => setLoginName(e.target.value)}
+            />
+            <input
+              type="password"
+              placeholder="Passwort"
+              value={loginPassword}
+              onChange={(e) => setLoginPassword(e.target.value)}
+            />
+            <button type="submit" disabled={loginLoading}>
+              {loginLoading ? "..." : "Login"}
+            </button>
+          </form>
+
+          {loginError && <p className="error">Login-Fehler: {loginError}</p>}
+
+          <p className="muted" style={{ marginTop: 8 }}>
+            Hinweis: Tasks laden/ändern geht erst nach Login.
+          </p>
+        </section>
+      )}
+
+      {/* KPIs: nur sinnvoll wenn eingeloggt */}
+      {token && (
+        <div className="kpi-bar">
+          <div className="kpi-card">
+            <span className="kpi-label">Total Tasks</span>
+            <span className="kpi-value">{total}</span>
+          </div>
+          <div className="kpi-card kpi-new">
+            <span className="kpi-label">New</span>
+            <span className="kpi-value">{totalNew}</span>
+          </div>
+          <div className="kpi-card kpi-progress">
+            <span className="kpi-label">In Progress</span>
+            <span className="kpi-value">{totalInProgress}</span>
+          </div>
+          <div className="kpi-card kpi-done">
+            <span className="kpi-label">Done</span>
+            <span className="kpi-value">{totalDone}</span>
+          </div>
+        </div>
+      )}
+
       <div className="dashboard-grid">
-        {/* Wetter-Bereich */}
+        {/* Wetter */}
         <section className="card">
           <h2>Wetter</h2>
 
-          {/* Eingabefeld für die Stadt + Button zum Laden der Wetterdaten */}
           <div className="row">
             <input
               type="text"
@@ -219,103 +239,94 @@ function App() {
             <button onClick={loadWeather}>Wetter laden</button>
           </div>
 
-          {/* Fehlermeldung für die Wetter-API */}
           {weatherError && (
             <p className="error">Fehler beim Wetter: {weatherError}</p>
           )}
 
-          {/* Wetterdaten werden angezeigt, wenn erfolgreich geladen */}
           {weather && (
             <div className="weather-info">
               <h3>{weather.name}</h3>
-              <p className="weather-temp">
-                {Math.round(weather.main.temp)}°C
-              </p>
-              <p className="weather-desc">
-                {weather.weather[0].description}
-              </p>
+              <p className="weather-temp">{Math.round(weather.main.temp)}°C</p>
+              <p className="weather-desc">{weather.weather[0].description}</p>
             </div>
           )}
         </section>
 
-        {/* Aufgaben-Bereich */}
+        {/* Tasks */}
         <section className="card">
           <h2>Aufgaben</h2>
 
-          {/* Formular zum Anlegen einer neuen Aufgabe */}
-          <form onSubmit={handleAddTask} className="row">
-            <input
-              type="text"
-              value={newTaskTitle}
-              onChange={(e) => setNewTaskTitle(e.target.value)}
-              placeholder="Neue Aufgabe..."
-            />
-            <button type="submit">Hinzufügen</button>
-          </form>
+          {!token ? (
+            <p className="muted">Bitte einloggen, um Tasks zu sehen.</p>
+          ) : (
+            <>
+              <form onSubmit={handleAddTask} className="row">
+                <input
+                  type="text"
+                  value={newTaskTitle}
+                  onChange={(e) => setNewTaskTitle(e.target.value)}
+                  placeholder="Neue Aufgabe..."
+                />
+                <button type="submit">Hinzufügen</button>
+              </form>
 
-          {/* Anzeige, dass Tasks gerade geladen werden */}
-          {tasksLoading && <p>Lade Aufgaben...</p>}
+              {tasksLoading && <p>Lade Aufgaben...</p>}
 
-          {/* Fehlermeldung für Probleme mit dem Task-Backend */}
-          {tasksError && (
-            <p className="error">Fehler bei Tasks: {tasksError}</p>
+              {tasksError && (
+                <p className="error">Fehler bei Tasks: {tasksError}</p>
+              )}
+
+              {tasks.length === 0 && !tasksLoading && (
+                <p className="muted">Noch keine Aufgaben vorhanden.</p>
+              )}
+
+              <ul className="task-list">
+                {tasks.map((task) => {
+                  const status = task.status || "NEW";
+                  const color = getStatusColor(status);
+
+                  return (
+                    <li key={task.id} className="task-item">
+                      <div className="task-main">
+                        <span className="task-title">{task.title}</span>
+                        <span
+                          className="status-pill"
+                          style={{
+                            backgroundColor: `${color}1A`,
+                            color,
+                            borderColor: color,
+                          }}
+                        >
+                          {status === "NEW"
+                            ? "New"
+                            : status === "IN_PROGRESS"
+                            ? "In Progress"
+                            : "Done"}
+                        </span>
+                      </div>
+
+                      <div className="task-actions">
+                        <select
+                          value={status}
+                          onChange={(e) =>
+                            handleStatusChange(task.id, e.target.value)
+                          }
+                        >
+                          <option value="NEW">New</option>
+                          <option value="IN_PROGRESS">In Progress</option>
+                          <option value="DONE">Done</option>
+                        </select>
+
+                        <button onClick={() => handleDeleteTask(task.id)}>
+                          Löschen
+                        </button>
+                      </div>
+                    </li>
+                  );
+                })}
+              </ul>
+            </>
           )}
-
-          {/* Hinweis, falls noch keine Aufgaben existieren */}
-          {tasks.length === 0 && !tasksLoading && (
-            <p className="muted">Noch keine Aufgaben vorhanden.</p>
-          )}
-
-          {/* Liste der Aufgaben */}
-          <ul className="task-list">
-            {tasks.map((task) => {
-              // Standardstatus ist NEW, falls keiner gesetzt ist
-              const status = task.status || "NEW";
-              const color = getStatusColor(status);
-
-              return (
-                <li key={task.id} className="task-item">
-                  {/* Titel und Status-Pill */}
-                  <div className="task-main">
-                    <span className="task-title">{task.title}</span>
-                    <span
-                      className="status-pill"
-                      style={{
-                        // Hintergrund leicht transparent in Status-Farbe
-                        backgroundColor: `${color}1A`,
-                        color,
-                        borderColor: color,
-                      }}
-                    >
-                      {status === "NEW"
-                        ? "New"
-                        : status === "IN_PROGRESS"
-                        ? "In Progress"
-                        : "Done"}
-                    </span>
-                  </div>
-
-                  {/* Aktionen pro Task: Status ändern und Löschen */}
-                  <div className="task-actions">
-                    <select
-                      value={status}
-                      onChange={(e) =>
-                        handleStatusChange(task.id, e.target.value)
-                      }
-                    >
-                      <option value="NEW">New</option>
-                      <option value="IN_PROGRESS">In Progress</option>
-                      <option value="DONE">Done</option>
-                    </select>
-
-                    <button onClick={() => handleDeleteTask(task.id)}>
-                      Löschen
-                    </button>
-                  </div>
-                </li>
-              );
-            })}
-          </ul>
         </section>
       </div>
     </div>

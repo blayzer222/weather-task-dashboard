@@ -1,66 +1,39 @@
 package com.example.weathertaskbackend.model;
 
-/*
- * Diese Klasse repräsentiert ein einzelnes Task-Objekt.
- * Sie wird sowohl vom Backend-Controller als auch vom Frontend genutzt.
- *
- * Felder:
- *  id      → eindeutige Nummer der Task
- *  title   → Beschreibung oder Titel der Aufgabe
- *  status  → Zustand der Aufgabe (NEW, IN_PROGRESS oder DONE)
- *
- * Dieses Modell wird automatisch durch Spring Boot in JSON konvertiert.
- */
+import com.fasterxml.jackson.annotation.JsonIgnore;
+import jakarta.persistence.*;
+
+@Entity
+@Table(name = "tasks")
 public class Task {
 
-    // Eindeutige ID der Task
-    private int id;
+    @Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "p_task_id")
+    private Integer id;
 
-    // Titel / Beschreibung der Aufgabe
+    @Column(nullable = false)
     private String title;
 
-    // Status der Aufgabe ("NEW", "IN_PROGRESS", "DONE")
+    @Column(nullable = false)
     private String status;
 
-    /*
-     * Leerer Konstruktor:
-     * Wird von Spring benötigt, um JSON automatisch in ein Java-Objekt umzuwandeln.
-     */
+    @JsonIgnore
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "f_account_id", nullable = false)
+    private Account account;
+
     public Task() {}
 
-    /*
-     * Konstruktor für Fälle, in denen wir alle Werte manuell setzen wollen.
-     */
-    public Task(int id, String title, String status) {
-        this.id = id;
-        this.title = title;
-        this.status = status;
-    }
+    public Integer getId() { return id; }
+    public void setId(Integer id) { this.id = id; }
 
-    // Getter & Setter Methoden
-    // Werden von Spring und vom Serializer genutzt.
+    public String getTitle() { return title; }
+    public void setTitle(String title) { this.title = title; }
 
-    public int getId() { 
-        return id; 
-    }
+    public String getStatus() { return status; }
+    public void setStatus(String status) { this.status = status; }
 
-    public void setId(int id) { 
-        this.id = id; 
-    }
-
-    public String getTitle() { 
-        return title; 
-    }
-
-    public void setTitle(String title) { 
-        this.title = title; 
-    }
-
-    public String getStatus() { 
-        return status; 
-    }
-
-    public void setStatus(String status) { 
-        this.status = status; 
-    }
+    public Account getAccount() { return account; }
+    public void setAccount(Account account) { this.account = account; }
 }
