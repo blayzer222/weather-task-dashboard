@@ -1,150 +1,141 @@
-/* Basis-Layout für gesamte Seite */
-html,
-body,
-#root {
-  height: 100%; /* macht die Seite vollflächig */
+/* src/App.css - APP STYLES */
+
+/* Theme Variablen */
+:root {
+  --bg: #f6f7fb;
+  --text: #0f172a;
+  --muted: #64748b;
+  --card: #ffffff;
+  --border: rgba(15, 23, 42, 0.08);
 }
 
-body {
-  margin: 0; /* Standardabstand entfernen */
-  background: #f9fafb; /* hellgrauer Hintergrund */
-  display: flex;
-  justify-content: center; /* gesamte App horizontal zentrieren */
-  align-items: flex-start; /* vertikal am oberen Bildschirm ausrichten */
-  /* wenn du komplett zentrieren willst → center */
+html.dark {
+  --bg: #0b1220;
+  --text: #e5e7eb;
+  --muted: #9ca3af;
+  --card: #0f1b33;
+  --border: rgba(255, 255, 255, 0.08);
 }
 
-/* Haupt-App-Container */
+/* App Layout: zentriert + max width */
 .app {
+  min-height: 100vh;
   width: 100%;
-  max-width: 1000px; /* macht Layout breiter als vorher */
-  margin: 2rem 0 3rem; /* Abstand oben/unten */
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 40px 24px;
 }
 
-/* Haupttitel */
+/* Typo */
 h1 {
   text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.8rem;
+  margin: 0 0 32px;
+  font-size: 1.9rem;
+  color: var(--text);
 }
 
-/* Karten-Styling (Wetter, Aufgaben etc.) */
+/* Cards */
 .card {
-  background: #ffffff;
-  border-radius: 12px; /* abgerundete Ecken */
-  padding: 1.5rem 1.75rem;
-  margin-bottom: 1.5rem;
-  box-shadow: 0 10px 25px rgba(15, 23, 42, 0.06); /* weicher Schatten */
+  background: var(--card);
+  border-radius: 16px;
+  padding: 28px;
+  border: 1px solid var(--border);
 }
 
-/* Grid für Wetter + Task-Bereich */
+/* Grid */
 .dashboard-grid {
   display: grid;
-  gap: 1.25rem; /* Abstand zwischen Spalten */
+  gap: 24px;
+  margin-top: 24px;
 }
 
-/* Zwei-Spalten-Layout ab Desktop-Breite */
-@media (min-width: 880px) {
+@media (min-width: 900px) {
   .dashboard-grid {
-    grid-template-columns: 1.1fr 1.2fr;
+    grid-template-columns: 1fr 1fr;
   }
 }
 
-/* Zeilen-Layout für Eingaben (Input + Button etc.) */
+/* Row / Inputs / Select */
 .row {
   display: flex;
-  gap: 0.75rem;
+  gap: 12px;
   align-items: center;
-  margin-bottom: 1rem;
+  margin-bottom: 16px;
 }
 
-/* Input-Felder */
-input {
+input,
+select {
   flex: 1;
-  padding: 0.5rem 0.75rem;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  font-size: 0.95rem;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
 }
 
-/* Standard-Button */
+input::placeholder {
+  color: var(--muted);
+}
+
+/* Button */
 button {
-  padding: 0.5rem 0.9rem;
-  border-radius: 6px;
+  padding: 8px 14px;
+  border-radius: 8px;
   border: none;
-  background: #2563eb; /* blau */
+  background: #2563eb;
   color: white;
-  font-weight: 500;
   cursor: pointer;
-  font-size: 0.9rem;
+  transition: 0.2s ease;
 }
 
-/* Button Hover-Effekt */
 button:hover {
   background: #1d4ed8;
 }
 
-/* Fehler-Text */
+/* Text helpers */
 .error {
-  color: #b91c1c;
-  margin-top: 0.25rem;
+  color: #ef4444;
 }
 
-/* grauer, unauffälliger Text */
 .muted {
-  color: #6b7280;
+  color: var(--muted);
 }
 
-/* Wetter-Anzeige */
-.weather-info {
-  margin-top: 0.5rem;
-}
-
-.weather-temp {
-  font-size: 2rem; /* große Temperaturanzeige */
-  font-weight: 600;
-  margin: 0.1rem 0;
-}
-
-.weather-desc {
-  text-transform: capitalize; /* erste Buchstaben groß */
-  color: #4b5563;
-}
-
-/* KPI-Bar für Dashboard-Zähler */
+/* KPI */
 .kpi-bar {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr)); /* 4 gleichgroße Spalten */
-  gap: 0.75rem;
-  margin-bottom: 1rem;
-}
-
-/* einzelne KPI-Karten */
-.kpi-card {
-  background: #ffffff;
-  border-radius: 10px;
-  padding: 0.6rem 0.75rem;
-  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.05); /* kleiner Schatten */
   display: flex;
-  flex-direction: column;
-  gap: 0.1rem;
+  gap: 16px;
+  margin: 30px 0;
+  flex-wrap: wrap;
 }
 
-/* kleine Überschrift über KPI-Wert */
+.kpi-card {
+  flex: 1;
+  min-width: 160px;
+  padding: 20px;
+  border-radius: 14px;
+  background: var(--card);
+  border: 1px solid var(--border);
+  transition: 0.2s ease;
+}
+
+.kpi-card:hover {
+  transform: translateY(-3px);
+}
+
 .kpi-label {
-  font-size: 0.7rem;
+  font-size: 0.75rem;
   text-transform: uppercase;
-  letter-spacing: 0.06em;
-  color: #6b7280;
+  letter-spacing: 1px;
+  color: var(--muted);
 }
 
-/* der eigentliche numerische KPI-Wert */
 .kpi-value {
-  font-size: 1.1rem;
+  font-size: 1.8rem;
   font-weight: 600;
+  margin-top: 6px;
 }
 
-/* Farben für verschiedene KPI-Bereiche */
 .kpi-new .kpi-value {
   color: #3b82f6;
 }
@@ -155,54 +146,71 @@ button:hover {
   color: #22c55e;
 }
 
-/* Task-Liste */
+html.dark .kpi-card:hover {
+  box-shadow: 0 0 18px rgba(59, 130, 246, 0.15);
+}
+
+/* Tasks */
 .task-list {
-  list-style: none; /* Punkte entfernen */
+  list-style: none;
   padding: 0;
   margin: 0;
 }
 
-/* einzelner Task */
 .task-item {
-  padding: 0.5rem 0;
-  border-bottom: 1px solid #f3f4f6; /* dünne graue Linie */
+  padding: 14px 0;
+  border-bottom: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  gap: 0.4rem;
+  gap: 10px;
 }
 
-/* Bereich mit Task-Titel + Status */
 .task-main {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  gap: 0.5rem;
 }
 
-.task-title {
-  font-size: 0.95rem;
-}
-
-/* Status-Badge */
 .status-pill {
-  padding: 0.15rem 0.6rem;
-  border-radius: 999px; /* runde Pille */
-  border: 1px solid transparent;
+  padding: 4px 12px;
+  border-radius: 999px;
   font-size: 0.75rem;
   font-weight: 500;
 }
 
-/* Bereich mit Dropdown + Löschen-Button */
-.task-actions {
-  display: flex;
-  gap: 0.5rem;
-  align-items: center;
+/* Weather */
+.weather-temp {
+  font-size: 2.2rem;
+  font-weight: 600;
+  margin: 8px 0;
 }
 
-/* Dropdown für Status */
-.task-actions select {
-  padding: 0.3rem 0.4rem;
-  border-radius: 6px;
-  border: 1px solid #d1d5db;
-  font-size: 0.8rem;
+.weather-desc {
+  color: var(--muted);
 }
+
+/* Toasts */
+.toast-stack {
+  position: fixed;
+  top: 14px;
+  right: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  z-index: 9999;
+}
+
+.toast {
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--card);
+  color: var(--text);
+  box-shadow: 0 10px 20px rgba(0,0,0,0.12);
+  min-width: 240px;
+  max-width: 360px;
+}
+
+.toast-success { border-color: rgba(34, 197, 94, 0.35); }
+.toast-error   { border-color: rgba(239, 68, 68, 0.35); }
+.toast-info    { border-color: rgba(59, 130, 246, 0.35); }

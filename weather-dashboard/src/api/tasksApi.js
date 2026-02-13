@@ -1,44 +1,55 @@
-const BASE_URL = "http://localhost:8081/api/tasks";
+const BASE_URL = "http://localhost:8081";
+const TASKS_PATH = "/api/tasks"; // <-- das ist sehr wahrscheinlich bei dir korrekt
 
-function authHeaders() {
+function authHeader() {
   const token = localStorage.getItem("token");
-  return {
-    "Content-Type": "application/json",
-    Authorization: `Bearer ${token}`,
-  };
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+async function request(path, options = {}) {
+  const res = await fetch(`${BASE_URL}${path}`, {
+    ...options,
+    headers: {
+      ...(options.headers || {}),
+      ...authHeader(),
+      "Content-Type": "application/json",
+    },
+  });
+
+  if (res.status === 401) {
+    const err = new Error("UNAUTHORIZED");
+    err.code = 401;
+    throw err;
+  }
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Request failed: ${res.status}`);
+  }
+
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) return res.json();
+  return res.text();
 }
 
 export async function fetchTasks() {
-  const res = await fetch(BASE_URL, { headers: authHeaders() });
-  if (!res.ok) throw new Error("Fehler beim Abrufen der Tasks: " + res.status);
-  return await res.json();
+  return request(`${TASKS_PATH}`, { method: "GET" });
 }
 
 export async function createTask(title) {
-  const res = await fetch(BASE_URL, {
+  return request(`${TASKS_PATH}`, {
     method: "POST",
-    headers: authHeaders(),
-    body: JSON.stringify({ title, status: "NEW" }),
+    body: JSON.stringify({ title }),
   });
-  if (!res.ok) throw new Error("Fehler beim Anlegen der Task: " + res.status);
-  return await res.json();
 }
 
 export async function deleteTask(id) {
-  const res = await fetch(`${BASE_URL}/${id}`, {
-    method: "DELETE",
-    headers: authHeaders(),
-  });
-  if (!res.ok) throw new Error("Fehler beim Löschen der Task: " + res.status);
+  return request(`${TASKS_PATH}/${id}`, { method: "DELETE" });
 }
 
 export async function updateTaskStatus(id, status) {
-  const res = await fetch(`${BASE_URL}/${id}/status`, {
+  return request(`${TASKS_PATH}/${id}/status`, {
     method: "PUT",
-    headers: authHeaders(),
     body: JSON.stringify({ status }),
   });
-  if (!res.ok)
-    throw new Error("Fehler beim Ändern des Status: " + res.status);
-  return await res.json();
 }

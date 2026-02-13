@@ -1,12 +1,27 @@
-const AUTH_URL = "http://localhost:8081/api/auth/login";
+const BASE_URL = "http://localhost:8081";
 
-export async function login(login, password) {
-  const res = await fetch(AUTH_URL, {
+async function post(path, body) {
+  const res = await fetch(`${BASE_URL}${path}`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ login, password }),
+    body: JSON.stringify(body),
   });
 
-  if (!res.ok) throw new Error("Login fehlgeschlagen: " + res.status);
-  return await res.json(); // { token }
+  if (!res.ok) {
+    const text = await res.text().catch(() => "");
+    throw new Error(text || `Auth failed: ${res.status}`);
+  }
+
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) return res.json();
+  return res.text();
+}
+
+export async function login(login, password) {
+  return post("/login", { login, password }); // => { token }
+}
+
+export async function register(login, password) {
+  // Backend gibt text "registered" zurück
+  return post("/register", { login, password });
 }

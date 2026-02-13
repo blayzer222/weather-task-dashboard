@@ -1,20 +1,81 @@
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   fetchTasks,
   createTask,
   deleteTask,
   updateTaskStatus,
 } from "./api/tasksApi";
-import { login as loginRequest } from "./api/authApi";
+import { login as loginRequest, register as registerRequest } from "./api/authApi";
 import "./App.css";
 
+// --- JWT Payload lesen (ohne Lib) ---
+function decodeJwtPayload(token) {
+  try {
+    const parts = token.split(".");
+    if (parts.length < 2) return null;
+
+    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
+    const padded = base64 + "===".slice((base64.length + 3) % 4);
+
+    const json = decodeURIComponent(
+      atob(padded)
+        .split("")
+        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
+        .join("")
+    );
+
+    return JSON.parse(json);
+  } catch {
+    return null;
+  }
+}
+
+function getLoginFromToken(token) {
+  const payload = decodeJwtPayload(token);
+  if (!payload) return null;
+  return payload.login || payload.username || payload.user || payload.sub || null;
+}
+
+/** Simple Toast Hook */
+function useToasts() {
+  const [toasts, setToasts] = useState([]);
+
+  function push(type, text) {
+    const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
+    setToasts((prev) => [...prev, { id, type, text }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 2600);
+  }
+
+  return { toasts, push };
+}
+
 function App() {
+  // ---------------- Toasts ----------------
+  const { toasts, push } = useToasts();
+
   // ---------------- Auth ----------------
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loginName, setLoginName] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [loginError, setLoginError] = useState(null);
-  const [loginLoading, setLoginLoading] = useState(false);
+  const [authMode, setAuthMode] = useState("login"); // login | register
+  const [authLoading, setAuthLoading] = useState(false);
+
+  // ---------------- Dark Mode ----------------
+  const [darkMode, setDarkMode] = useState(
+    localStorage.getItem("theme") === "dark"
+  );
+
+  useEffect(() => {
+    document.documentElement.classList.toggle("dark", darkMode);
+    localStorage.setItem("theme", darkMode ? "dark" : "light");
+  }, [darkMode]);
+
+  const displayLogin = useMemo(() => {
+    if (!token) return null;
+    return getLoginFromToken(token);
+  }, [token]);
 
   // ---------------- Wetter ----------------
   const [city, setCity] = useState("Berlin");
@@ -38,7 +99,6 @@ function App() {
       const res = await fetch(
         `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=de`
       );
-
       if (!res.ok) throw new Error("Stadt nicht gefunden oder API-Fehler");
 
       const data = await res.json();
@@ -46,10 +106,11 @@ function App() {
     } catch (err) {
       setWeather(null);
       setWeatherError(err.message);
+      push("error", err.message);
     }
   }
 
-  // ---------------- Tasks laden ----------------
+  // ---------------- Tasks laden (mit Auto-Logout bei 401) ----------------
   async function loadTasks() {
     try {
       setTasksLoading(true);
@@ -58,48 +119,68 @@ function App() {
       const data = await fetchTasks();
       setTasks(data);
     } catch (err) {
+      // Auto-Logout wenn Token ungültig/abgelaufen
+      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
+        handleLogout(true);
+        return;
+      }
       setTasksError(err.message);
+      push("error", err.message);
     } finally {
       setTasksLoading(false);
     }
   }
 
-  // ---------------- Initial: Wetter immer, Tasks nur wenn eingeloggt ----------------
+  // Initial
   useEffect(() => {
     loadWeather();
+  }, []);
+
+  // Wenn Token gesetzt: Tasks automatisch laden
+  useEffect(() => {
     if (token) loadTasks();
   }, [token]);
 
-  // ---------------- Login ----------------
-  async function handleLogin(e) {
+  // ---------------- Login/Register ----------------
+  async function handleAuth(e) {
     e.preventDefault();
-
     if (!loginName.trim() || !loginPassword) return;
 
     try {
-      setLoginLoading(true);
-      setLoginError(null);
+      setAuthLoading(true);
 
-      const data = await loginRequest(loginName.trim(), loginPassword);
-      localStorage.setItem("token", data.token);
-      setToken(data.token);
+      if (authMode === "login") {
+        const data = await loginRequest(loginName.trim(), loginPassword);
+        localStorage.setItem("token", data.token);
+        setToken(data.token);
 
-      setLoginName("");
-      setLoginPassword("");
+        setLoginName("");
+        setLoginPassword("");
+
+        push("success", "Eingeloggt");
+      } else {
+        await registerRequest(loginName.trim(), loginPassword);
+        setAuthMode("login");
+        setLoginPassword("");
+
+        push("success", "Registriert. Jetzt einloggen.");
+      }
     } catch (err) {
-      setLoginError(err.message);
+      push("error", err.message);
     } finally {
-      setLoginLoading(false);
+      setAuthLoading(false);
     }
   }
 
-  function handleLogout() {
+  function handleLogout(isAuto = false) {
     localStorage.removeItem("token");
     setToken(null);
 
-    // UI aufräumen
     setTasks([]);
     setTasksError(null);
+
+    if (isAuto) push("error", "Session abgelaufen. Bitte neu einloggen.");
+    else push("info", "Logout");
   }
 
   // ---------------- Task anlegen ----------------
@@ -111,8 +192,14 @@ function App() {
       const created = await createTask(newTaskTitle.trim());
       setTasks((prev) => [...prev, created]);
       setNewTaskTitle("");
+      push("success", "Task erstellt");
     } catch (err) {
+      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
+        handleLogout(true);
+        return;
+      }
       setTasksError(err.message);
+      push("error", err.message);
     }
   }
 
@@ -121,8 +208,14 @@ function App() {
     try {
       await deleteTask(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
+      push("info", "Task gelöscht");
     } catch (err) {
+      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
+        handleLogout(true);
+        return;
+      }
       setTasksError(err.message);
+      push("error", err.message);
     }
   }
 
@@ -135,8 +228,14 @@ function App() {
           task.id === id ? { ...task, status: updated.status } : task
         )
       );
+      push("success", "Status aktualisiert");
     } catch (err) {
+      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
+        handleLogout(true);
+        return;
+      }
       setTasksError(err.message);
+      push("error", err.message);
     }
   }
 
@@ -159,24 +258,62 @@ function App() {
   const totalInProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
   const totalDone = tasks.filter((t) => t.status === "DONE").length;
 
-  // ---------------- Render ----------------
   return (
     <div className="app">
-      <div className="row" style={{ justifyContent: "space-between" }}>
-        <h1>Weather &amp; Task Dashboard</h1>
-
-        {token ? (
-          <button onClick={handleLogout}>Logout</button>
-        ) : (
-          <span className="muted">Nicht eingeloggt</span>
-        )}
+      {/* Toasts */}
+      <div className="toast-stack">
+        {toasts.map((t) => (
+          <div key={t.id} className={`toast toast-${t.type}`}>
+            {t.text}
+          </div>
+        ))}
       </div>
 
-      {/* Login-Panel (nur wenn kein Token vorhanden) */}
+      <div className="row topbar" style={{ justifyContent: "space-between" }}>
+        <h1>Weather &amp; Task Dashboard</h1>
+
+        <div className="row" style={{ gap: 10, alignItems: "center" }}>
+          <button
+            type="button"
+            className="ghost"
+            onClick={() => setDarkMode((v) => !v)}
+            title="Dark Mode umschalten"
+          >
+            {darkMode ? "☀️" : "🌙"}
+          </button>
+
+          {token ? (
+            <>
+              <span className="muted">
+                Eingeloggt{displayLogin ? `: ${displayLogin}` : ""}
+              </span>
+              <button onClick={() => handleLogout(false)}>Logout</button>
+            </>
+          ) : (
+            <span className="muted">Nicht eingeloggt</span>
+          )}
+        </div>
+      </div>
+
+      {/* Login/Register Panel */}
       {!token && (
         <section className="card" style={{ marginBottom: 16 }}>
-          <h2>Login</h2>
-          <form onSubmit={handleLogin} className="row">
+          <div className="row" style={{ justifyContent: "space-between" }}>
+            <h2 style={{ margin: 0 }}>
+              {authMode === "login" ? "Login" : "Registrieren"}
+            </h2>
+
+            <button
+              type="button"
+              onClick={() => {
+                setAuthMode(authMode === "login" ? "register" : "login");
+              }}
+            >
+              {authMode === "login" ? "Registrieren" : "Zum Login"}
+            </button>
+          </div>
+
+          <form onSubmit={handleAuth} className="row" style={{ marginTop: 16 }}>
             <input
               type="text"
               placeholder="Login"
@@ -189,12 +326,14 @@ function App() {
               value={loginPassword}
               onChange={(e) => setLoginPassword(e.target.value)}
             />
-            <button type="submit" disabled={loginLoading}>
-              {loginLoading ? "..." : "Login"}
+            <button type="submit" disabled={authLoading}>
+              {authLoading
+                ? "..."
+                : authMode === "login"
+                ? "Login"
+                : "Registrieren"}
             </button>
           </form>
-
-          {loginError && <p className="error">Login-Fehler: {loginError}</p>}
 
           <p className="muted" style={{ marginTop: 8 }}>
             Hinweis: Tasks laden/ändern geht erst nach Login.
@@ -202,7 +341,7 @@ function App() {
         </section>
       )}
 
-      {/* KPIs: nur sinnvoll wenn eingeloggt */}
+      {/* KPIs: nur wenn eingeloggt */}
       {token && (
         <div className="kpi-bar">
           <div className="kpi-card">
@@ -270,7 +409,7 @@ function App() {
                 <button type="submit">Hinzufügen</button>
               </form>
 
-              {tasksLoading && <p>Lade Aufgaben...</p>}
+              {tasksLoading && <p className="muted">Lade Aufgaben...</p>}
 
               {tasksError && (
                 <p className="error">Fehler bei Tasks: {tasksError}</p>
@@ -289,12 +428,15 @@ function App() {
                     <li key={task.id} className="task-item">
                       <div className="task-main">
                         <span className="task-title">{task.title}</span>
+
                         <span
                           className="status-pill"
                           style={{
                             backgroundColor: `${color}1A`,
                             color,
                             borderColor: color,
+                            borderWidth: 1,
+                            borderStyle: "solid",
                           }}
                         >
                           {status === "NEW"
