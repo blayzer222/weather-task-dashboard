@@ -5,77 +5,37 @@ import {
   deleteTask,
   updateTaskStatus,
 } from "./api/tasksApi";
-import { login as loginRequest, register as registerRequest } from "./api/authApi";
+import { login as loginRequest } from "./api/authApi";
 import "./App.css";
 
-// --- JWT Payload lesen (ohne Lib) ---
-function decodeJwtPayload(token) {
-  try {
-    const parts = token.split(".");
-    if (parts.length < 2) return null;
-
-    const base64 = parts[1].replace(/-/g, "+").replace(/_/g, "/");
-    const padded = base64 + "===".slice((base64.length + 3) % 4);
-
-    const json = decodeURIComponent(
-      atob(padded)
-        .split("")
-        .map((c) => "%" + c.charCodeAt(0).toString(16).padStart(2, "0"))
-        .join("")
-    );
-
-    return JSON.parse(json);
-  } catch {
-    return null;
-  }
-}
-
-function getLoginFromToken(token) {
-  const payload = decodeJwtPayload(token);
-  if (!payload) return null;
-  return payload.login || payload.username || payload.user || payload.sub || null;
-}
-
-/** Simple Toast Hook */
-function useToasts() {
-  const [toasts, setToasts] = useState([]);
-
-  function push(type, text) {
-    const id = crypto.randomUUID ? crypto.randomUUID() : String(Date.now() + Math.random());
-    setToasts((prev) => [...prev, { id, type, text }]);
-    setTimeout(() => {
-      setToasts((prev) => prev.filter((t) => t.id !== id));
-    }, 2600);
-  }
-
-  return { toasts, push };
-}
-
 function App() {
-  // ---------------- Toasts ----------------
-  const { toasts, push } = useToasts();
-
   // ---------------- Auth ----------------
   const [token, setToken] = useState(localStorage.getItem("token"));
   const [loginName, setLoginName] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
-  const [authMode, setAuthMode] = useState("login"); // login | register
-  const [authLoading, setAuthLoading] = useState(false);
+  const [loginError, setLoginError] = useState(null);
+  const [loginLoading, setLoginLoading] = useState(false);
+
+  // ---------------- Toasts (kleine Meldungen) ----------------
+  const [toasts, setToasts] = useState([]);
+  function pushToast(type, text) {
+    const id = crypto.randomUUID();
+    setToasts((prev) => [...prev, { id, type, text }]);
+    setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  }
 
   // ---------------- Dark Mode ----------------
-  const [darkMode, setDarkMode] = useState(
-    localStorage.getItem("theme") === "dark"
+  const [dark, setDark] = useState(() =>
+    document.documentElement.classList.contains("dark")
   );
 
-  useEffect(() => {
-    document.documentElement.classList.toggle("dark", darkMode);
-    localStorage.setItem("theme", darkMode ? "dark" : "light");
-  }, [darkMode]);
-
-  const displayLogin = useMemo(() => {
-    if (!token) return null;
-    return getLoginFromToken(token);
-  }, [token]);
+  function toggleDarkMode() {
+    const html = document.documentElement;
+    html.classList.toggle("dark");
+    setDark(html.classList.contains("dark"));
+  }
 
   // ---------------- Wetter ----------------
   const [city, setCity] = useState("Berlin");
@@ -88,6 +48,10 @@ function App() {
   const [newTaskTitle, setNewTaskTitle] = useState("");
   const [tasksLoading, setTasksLoading] = useState(false);
 
+  // ---------------- Filter ----------------
+  const [filter, setFilter] = useState("ALL"); // ALL | NEW | IN_PROGRESS | DONE
+  const [query, setQuery] = useState(""); // Suche
+
   const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
 
   // ---------------- Wetter laden ----------------
@@ -97,8 +61,11 @@ function App() {
       setWeatherError(null);
 
       const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=de`
+        `https://api.openweathermap.org/data/2.5/weather?q=${encodeURIComponent(
+          city
+        )}&appid=${API_KEY}&units=metric&lang=de`
       );
+
       if (!res.ok) throw new Error("Stadt nicht gefunden oder API-Fehler");
 
       const data = await res.json();
@@ -106,11 +73,10 @@ function App() {
     } catch (err) {
       setWeather(null);
       setWeatherError(err.message);
-      push("error", err.message);
     }
   }
 
-  // ---------------- Tasks laden (mit Auto-Logout bei 401) ----------------
+  // ---------------- Tasks laden ----------------
   async function loadTasks() {
     try {
       setTasksLoading(true);
@@ -119,68 +85,60 @@ function App() {
       const data = await fetchTasks();
       setTasks(data);
     } catch (err) {
-      // Auto-Logout wenn Token ungültig/abgelaufen
-      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
-        handleLogout(true);
+      // Wenn Backend 401 -> Session abgelaufen -> logout
+      if (err?.code === 401 || String(err?.message || "").includes("401")) {
+        pushToast("error", "Session abgelaufen. Bitte neu einloggen.");
+        handleLogout();
         return;
       }
       setTasksError(err.message);
-      push("error", err.message);
     } finally {
       setTasksLoading(false);
     }
   }
 
-  // Initial
+  // ---------------- Initial: Wetter immer, Tasks nur wenn eingeloggt ----------------
   useEffect(() => {
     loadWeather();
-  }, []);
-
-  // Wenn Token gesetzt: Tasks automatisch laden
-  useEffect(() => {
     if (token) loadTasks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [token]);
 
-  // ---------------- Login/Register ----------------
-  async function handleAuth(e) {
+  // ---------------- Login ----------------
+  async function handleLogin(e) {
     e.preventDefault();
     if (!loginName.trim() || !loginPassword) return;
 
     try {
-      setAuthLoading(true);
+      setLoginLoading(true);
+      setLoginError(null);
 
-      if (authMode === "login") {
-        const data = await loginRequest(loginName.trim(), loginPassword);
-        localStorage.setItem("token", data.token);
-        setToken(data.token);
+      const data = await loginRequest(loginName.trim(), loginPassword);
+      localStorage.setItem("token", data.token);
+      setToken(data.token);
 
-        setLoginName("");
-        setLoginPassword("");
+      setLoginName("");
+      setLoginPassword("");
 
-        push("success", "Eingeloggt");
-      } else {
-        await registerRequest(loginName.trim(), loginPassword);
-        setAuthMode("login");
-        setLoginPassword("");
-
-        push("success", "Registriert. Jetzt einloggen.");
-      }
+      pushToast("success", "Eingeloggt");
     } catch (err) {
-      push("error", err.message);
+      setLoginError(err.message);
+      pushToast("error", "Login fehlgeschlagen");
     } finally {
-      setAuthLoading(false);
+      setLoginLoading(false);
     }
   }
 
-  function handleLogout(isAuto = false) {
+  function handleLogout() {
     localStorage.removeItem("token");
     setToken(null);
 
     setTasks([]);
     setTasksError(null);
+    setFilter("ALL");
+    setQuery("");
 
-    if (isAuto) push("error", "Session abgelaufen. Bitte neu einloggen.");
-    else push("info", "Logout");
+    pushToast("success", "Ausgeloggt");
   }
 
   // ---------------- Task anlegen ----------------
@@ -192,14 +150,15 @@ function App() {
       const created = await createTask(newTaskTitle.trim());
       setTasks((prev) => [...prev, created]);
       setNewTaskTitle("");
-      push("success", "Task erstellt");
+      pushToast("success", "Task erstellt");
     } catch (err) {
-      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
-        handleLogout(true);
+      if (err?.code === 401 || String(err?.message || "").includes("401")) {
+        pushToast("error", "Session abgelaufen. Bitte neu einloggen.");
+        handleLogout();
         return;
       }
       setTasksError(err.message);
-      push("error", err.message);
+      pushToast("error", "Task konnte nicht erstellt werden");
     }
   }
 
@@ -208,14 +167,15 @@ function App() {
     try {
       await deleteTask(id);
       setTasks((prev) => prev.filter((t) => t.id !== id));
-      push("info", "Task gelöscht");
+      pushToast("success", "Task gelöscht");
     } catch (err) {
-      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
-        handleLogout(true);
+      if (err?.code === 401 || String(err?.message || "").includes("401")) {
+        pushToast("error", "Session abgelaufen. Bitte neu einloggen.");
+        handleLogout();
         return;
       }
       setTasksError(err.message);
-      push("error", err.message);
+      pushToast("error", "Task konnte nicht gelöscht werden");
     }
   }
 
@@ -228,14 +188,15 @@ function App() {
           task.id === id ? { ...task, status: updated.status } : task
         )
       );
-      push("success", "Status aktualisiert");
+      pushToast("success", "Status aktualisiert");
     } catch (err) {
-      if (err?.code === 401 || err?.message === "UNAUTHORIZED") {
-        handleLogout(true);
+      if (err?.code === 401 || String(err?.message || "").includes("401")) {
+        pushToast("error", "Session abgelaufen. Bitte neu einloggen.");
+        handleLogout();
         return;
       }
       setTasksError(err.message);
-      push("error", err.message);
+      pushToast("error", "Status konnte nicht geändert werden");
     }
   }
 
@@ -258,36 +219,64 @@ function App() {
   const totalInProgress = tasks.filter((t) => t.status === "IN_PROGRESS").length;
   const totalDone = tasks.filter((t) => t.status === "DONE").length;
 
+  // ---------------- Filtered Tasks ----------------
+  const filteredTasks = useMemo(() => {
+    const normalizedQuery = query.trim().toLowerCase();
+
+    return tasks
+      .map((t) => ({ ...t, status: t.status || "NEW" }))
+      .filter((t) => {
+        if (filter !== "ALL" && t.status !== filter) return false;
+        if (!normalizedQuery) return true;
+        return (t.title || "").toLowerCase().includes(normalizedQuery);
+      });
+  }, [tasks, filter, query]);
+
+  // ---------------- Render ----------------
   return (
     <div className="app">
       {/* Toasts */}
-      <div className="toast-stack">
+      <div style={{ position: "fixed", top: 16, right: 16, zIndex: 9999 }}>
         {toasts.map((t) => (
-          <div key={t.id} className={`toast toast-${t.type}`}>
-            {t.text}
+          <div
+            key={t.id}
+            style={{
+              marginBottom: 10,
+              padding: "10px 12px",
+              borderRadius: 10,
+              border: "1px solid var(--border)",
+              background: "var(--card)",
+              color: "var(--text)",
+              minWidth: 280,
+              boxShadow: "0 10px 25px rgba(15, 23, 42, 0.12)",
+            }}
+          >
+            <div style={{ fontWeight: 600, marginBottom: 4 }}>
+              {t.type === "success" ? "✅" : t.type === "error" ? "❌" : "ℹ️"}{" "}
+              {t.type === "success"
+                ? "OK"
+                : t.type === "error"
+                ? "Fehler"
+                : "Info"}
+            </div>
+            <div style={{ color: "var(--muted)" }}>{t.text}</div>
           </div>
         ))}
       </div>
 
-      <div className="row topbar" style={{ justifyContent: "space-between" }}>
-        <h1>Weather &amp; Task Dashboard</h1>
+      {/* Topbar */}
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h1 style={{ margin: 0 }}>Weather &amp; Task Dashboard</h1>
 
-        <div className="row" style={{ gap: 10, alignItems: "center" }}>
-          <button
-            type="button"
-            className="ghost"
-            onClick={() => setDarkMode((v) => !v)}
-            title="Dark Mode umschalten"
-          >
-            {darkMode ? "☀️" : "🌙"}
+        <div className="row" style={{ marginBottom: 0 }}>
+          <button className="ghost" onClick={toggleDarkMode} title="Dark Mode">
+            {dark ? "🌞" : "🌙"}
           </button>
 
           {token ? (
             <>
-              <span className="muted">
-                Eingeloggt{displayLogin ? `: ${displayLogin}` : ""}
-              </span>
-              <button onClick={() => handleLogout(false)}>Logout</button>
+              <span className="muted">Eingeloggt</span>
+              <button onClick={handleLogout}>Logout</button>
             </>
           ) : (
             <span className="muted">Nicht eingeloggt</span>
@@ -295,25 +284,11 @@ function App() {
         </div>
       </div>
 
-      {/* Login/Register Panel */}
+      {/* Login-Panel (nur wenn kein Token vorhanden) */}
       {!token && (
-        <section className="card" style={{ marginBottom: 16 }}>
-          <div className="row" style={{ justifyContent: "space-between" }}>
-            <h2 style={{ margin: 0 }}>
-              {authMode === "login" ? "Login" : "Registrieren"}
-            </h2>
-
-            <button
-              type="button"
-              onClick={() => {
-                setAuthMode(authMode === "login" ? "register" : "login");
-              }}
-            >
-              {authMode === "login" ? "Registrieren" : "Zum Login"}
-            </button>
-          </div>
-
-          <form onSubmit={handleAuth} className="row" style={{ marginTop: 16 }}>
+        <section className="card" style={{ marginTop: 18 }}>
+          <h2 style={{ marginTop: 0 }}>Login</h2>
+          <form onSubmit={handleLogin} className="row">
             <input
               type="text"
               placeholder="Login"
@@ -326,14 +301,12 @@ function App() {
               value={loginPassword}
               onChange={(e) => setLoginPassword(e.target.value)}
             />
-            <button type="submit" disabled={authLoading}>
-              {authLoading
-                ? "..."
-                : authMode === "login"
-                ? "Login"
-                : "Registrieren"}
+            <button type="submit" disabled={loginLoading}>
+              {loginLoading ? "..." : "Login"}
             </button>
           </form>
+
+          {loginError && <p className="error">Login-Fehler: {loginError}</p>}
 
           <p className="muted" style={{ marginTop: 8 }}>
             Hinweis: Tasks laden/ändern geht erst nach Login.
@@ -341,7 +314,7 @@ function App() {
         </section>
       )}
 
-      {/* KPIs: nur wenn eingeloggt */}
+      {/* KPIs: nur sinnvoll wenn eingeloggt */}
       {token && (
         <div className="kpi-bar">
           <div className="kpi-card">
@@ -366,7 +339,7 @@ function App() {
       <div className="dashboard-grid">
         {/* Wetter */}
         <section className="card">
-          <h2>Wetter</h2>
+          <h2 style={{ marginTop: 0 }}>Wetter</h2>
 
           <div className="row">
             <input
@@ -393,12 +366,13 @@ function App() {
 
         {/* Tasks */}
         <section className="card">
-          <h2>Aufgaben</h2>
+          <h2 style={{ marginTop: 0 }}>Aufgaben</h2>
 
           {!token ? (
             <p className="muted">Bitte einloggen, um Tasks zu sehen.</p>
           ) : (
             <>
+              {/* Add Task */}
               <form onSubmit={handleAddTask} className="row">
                 <input
                   type="text"
@@ -409,18 +383,81 @@ function App() {
                 <button type="submit">Hinzufügen</button>
               </form>
 
-              {tasksLoading && <p className="muted">Lade Aufgaben...</p>}
+              {/* FILTER BAR */}
+              <div className="row" style={{ justifyContent: "space-between" }}>
+                <div className="row" style={{ marginBottom: 0 }}>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setFilter("ALL")}
+                    style={{
+                      borderColor:
+                        filter === "ALL" ? "rgba(59,130,246,0.55)" : "var(--border)",
+                    }}
+                  >
+                    Alle ({total})
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setFilter("NEW")}
+                    style={{
+                      borderColor:
+                        filter === "NEW" ? "rgba(59,130,246,0.55)" : "var(--border)",
+                    }}
+                  >
+                    New ({totalNew})
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setFilter("IN_PROGRESS")}
+                    style={{
+                      borderColor:
+                        filter === "IN_PROGRESS"
+                          ? "rgba(245,158,11,0.55)"
+                          : "var(--border)",
+                    }}
+                  >
+                    In Progress ({totalInProgress})
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost"
+                    onClick={() => setFilter("DONE")}
+                    style={{
+                      borderColor:
+                        filter === "DONE" ? "rgba(34,197,94,0.55)" : "var(--border)",
+                    }}
+                  >
+                    Done ({totalDone})
+                  </button>
+                </div>
+
+                {/* Suche */}
+                <input
+                  type="text"
+                  value={query}
+                  onChange={(e) => setQuery(e.target.value)}
+                  placeholder="Suchen…"
+                  style={{ maxWidth: 220, marginBottom: 0 }}
+                />
+              </div>
+
+              {tasksLoading && <p>Lade Aufgaben...</p>}
 
               {tasksError && (
                 <p className="error">Fehler bei Tasks: {tasksError}</p>
               )}
 
-              {tasks.length === 0 && !tasksLoading && (
-                <p className="muted">Noch keine Aufgaben vorhanden.</p>
+              {!tasksLoading && filteredTasks.length === 0 && (
+                <p className="muted" style={{ marginTop: 10 }}>
+                  Keine Tasks für diesen Filter.
+                </p>
               )}
 
               <ul className="task-list">
-                {tasks.map((task) => {
+                {filteredTasks.map((task) => {
                   const status = task.status || "NEW";
                   const color = getStatusColor(status);
 
@@ -428,15 +465,12 @@ function App() {
                     <li key={task.id} className="task-item">
                       <div className="task-main">
                         <span className="task-title">{task.title}</span>
-
                         <span
                           className="status-pill"
                           style={{
                             backgroundColor: `${color}1A`,
                             color,
-                            borderColor: color,
-                            borderWidth: 1,
-                            borderStyle: "solid",
+                            border: `1px solid ${color}`,
                           }}
                         >
                           {status === "NEW"
