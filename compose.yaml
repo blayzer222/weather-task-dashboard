@@ -30,8 +30,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:mysql://mysql:3306/weather_task_dashboard?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
       SPRING_DATASOURCE_USERNAME: appuser
       SPRING_DATASOURCE_PASSWORD: apppassword
-      SPRING_JPA_HIBERNATE_DDL_AUTO: validate
-      SPRING_FLYWAY_ENABLED: "true"
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      SPRING_FLYWAY_ENABLED: "false"
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
 
   frontend:

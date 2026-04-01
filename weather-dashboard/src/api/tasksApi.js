@@ -1,5 +1,5 @@
 const BASE_URL = "http://localhost:8081";
-const TASKS_PATH = "/api/tasks"; // <-- das ist sehr wahrscheinlich bei dir korrekt
+const TASKS_PATH = "/api/tasks";
 
 function authHeader() {
   const token = localStorage.getItem("token");
@@ -36,10 +36,17 @@ export async function fetchTasks() {
   return request(`${TASKS_PATH}`, { method: "GET" });
 }
 
-export async function createTask(title) {
+export async function createTask(task) {
   return request(`${TASKS_PATH}`, {
     method: "POST",
-    body: JSON.stringify({ title }),
+    body: JSON.stringify(task),
+  });
+}
+
+export async function updateTask(id, task) {
+  return request(`${TASKS_PATH}/${id}`, {
+    method: "PUT",
+    body: JSON.stringify(task),
   });
 }
 
