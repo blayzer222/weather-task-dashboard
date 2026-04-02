@@ -26,20 +26,23 @@ function App() {
     localStorage.getItem("theme") === "dark"
   );
 
-  useEffect(() => {
-    if (darkMode) {
-      document.documentElement.classList.add("dark");
-      localStorage.setItem("theme", "dark");
-    } else {
-      document.documentElement.classList.remove("dark");
-      localStorage.setItem("theme", "light");
-    }
-  }, [darkMode]);
-
-  // ---------------- Wetter ----------------
+  // ---------------- Weather ----------------
   const [city, setCity] = useState("Berlin");
   const [weather, setWeather] = useState(null);
   const [weatherError, setWeatherError] = useState(null);
+
+  // ---------------- User Profile ----------------
+  const [userProfile, setUserProfile] = useState(null);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+
+  const [profileEmail, setProfileEmail] = useState("");
+  const [profilePhone, setProfilePhone] = useState("");
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState("");
+
+  const [headerAvatarError, setHeaderAvatarError] = useState(false);
+  const [modalAvatarError, setModalAvatarError] = useState(false);
 
   // ---------------- Tasks ----------------
   const [tasks, setTasks] = useState([]);
@@ -51,26 +54,79 @@ function App() {
   const [newTaskPriority, setNewTaskPriority] = useState("MEDIUM");
 
   // ---------------- Filter / Sort / Search ----------------
-  const [statusFilter, setStatusFilter] = useState("ALL");
+  const [activeTab, setActiveTab] = useState("ALL");
   const [priorityFilter, setPriorityFilter] = useState("ALL");
   const [sortMode, setSortMode] = useState("NEWEST");
   const [searchTerm, setSearchTerm] = useState("");
 
-  // ---------------- Edit ----------------
-  const [editingTaskId, setEditingTaskId] = useState(null);
+  // ---------------- Task Edit Modal ----------------
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTask, setEditingTask] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editDescription, setEditDescription] = useState("");
   const [editPriority, setEditPriority] = useState("MEDIUM");
+  const [editLoading, setEditLoading] = useState(false);
+
+  // ---------------- Delete Dialog ----------------
+  const [taskToDelete, setTaskToDelete] = useState(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
+  // ---------------- Toasts ----------------
+  const [toasts, setToasts] = useState([]);
 
   const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
+  const BACKEND_URL = "http://localhost:8081";
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+      localStorage.setItem("theme", "dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+      localStorage.setItem("theme", "light");
+    }
+  }, [darkMode]);
+
+  useEffect(() => {
+    setHeaderAvatarError(false);
+  }, [userProfile?.avatarUrl]);
+
+  useEffect(() => {
+    setModalAvatarError(false);
+  }, [profileAvatarUrl]);
 
   // ---------------- Helpers ----------------
+  function showToast(message, type = "success") {
+    const id = Date.now() + Math.random();
+    const toast = { id, message, type };
+    setToasts((prev) => [...prev, toast]);
+
+    window.setTimeout(() => {
+      setToasts((prev) => prev.filter((t) => t.id !== id));
+    }, 3000);
+  }
+
+  function getInitials(name) {
+    if (!name) return "U";
+    return name
+      .trim()
+      .split(" ")
+      .filter(Boolean)
+      .map((part) => part[0])
+      .join("")
+      .slice(0, 2)
+      .toUpperCase();
+  }
+
   function handleLogout() {
     localStorage.removeItem("token");
     setToken(null);
     setTasks([]);
     setTasksError(null);
     setLoginError(null);
+    setUserProfile(null);
+    setIsProfileModalOpen(false);
+    showToast("Erfolgreich ausgeloggt", "info");
   }
 
   function getStatusColor(status) {
@@ -98,38 +154,75 @@ function App() {
     }
   }
 
-  function getPriorityLabel(priority) {
-    switch (priority) {
-      case "HIGH":
-        return "High";
-      case "LOW":
-        return "Low";
-      case "MEDIUM":
-      default:
-        return "Medium";
-    }
-  }
-
-  function getStatusLabel(status) {
-    switch (status) {
-      case "IN_PROGRESS":
-        return "In Progress";
-      case "DONE":
-        return "Done";
-      case "NEW":
-      default:
-        return "New";
-    }
-  }
-
   function clearFilters() {
-    setStatusFilter("ALL");
+    setActiveTab("ALL");
     setPriorityFilter("ALL");
     setSortMode("NEWEST");
     setSearchTerm("");
   }
 
-  // ---------------- Wetter laden ----------------
+  function fillDemoTask(type) {
+    if (type === "quick") {
+      setNewTaskTitle("Quick Review");
+      setNewTaskDescription("Check open tasks and update their status");
+      setNewTaskPriority("MEDIUM");
+    } else if (type === "important") {
+      setNewTaskTitle("Important Task");
+      setNewTaskDescription("Finish the most important work for today");
+      setNewTaskPriority("HIGH");
+    } else {
+      setNewTaskTitle("Small Task");
+      setNewTaskDescription("Complete a simple low priority task");
+      setNewTaskPriority("LOW");
+    }
+  }
+
+  function openEditModal(task) {
+    setEditingTask(task);
+    setEditTitle(task.title || "");
+    setEditDescription(task.description || "");
+    setEditPriority(task.priority || "MEDIUM");
+    setIsEditModalOpen(true);
+  }
+
+  function closeEditModal() {
+    setIsEditModalOpen(false);
+    setEditingTask(null);
+    setEditTitle("");
+    setEditDescription("");
+    setEditPriority("MEDIUM");
+    setEditLoading(false);
+  }
+
+  function openDeleteDialog(task) {
+    setTaskToDelete(task);
+  }
+
+  function closeDeleteDialog() {
+    setTaskToDelete(null);
+    setDeleteLoading(false);
+  }
+
+  function openProfileModal() {
+    if (!userProfile) return;
+    setProfileEmail(userProfile.email || "");
+    setProfilePhone(userProfile.phone || "");
+    setProfileAvatarUrl(userProfile.avatarUrl || "");
+    setModalAvatarError(false);
+    setIsProfileModalOpen(true);
+  }
+
+  function closeProfileModal() {
+    setIsProfileModalOpen(false);
+    setProfileSaving(false);
+  }
+
+  function getTabCount(tab) {
+    if (tab === "ALL") return tasks.length;
+    return tasks.filter((task) => (task.status || "NEW") === tab).length;
+  }
+
+  // ---------------- Weather ----------------
   async function loadWeather() {
     if (!city.trim()) return;
 
@@ -152,7 +245,68 @@ function App() {
     }
   }
 
-  // ---------------- Tasks laden ----------------
+  // ---------------- Profile ----------------
+  async function loadProfile(currentToken = token) {
+    if (!currentToken) return;
+
+    try {
+      setProfileLoading(true);
+
+      const res = await fetch(`${BACKEND_URL}/api/account/me`, {
+        headers: {
+          Authorization: `Bearer ${currentToken}`,
+        },
+      });
+
+      if (!res.ok) {
+        throw new Error("Profil konnte nicht geladen werden");
+      }
+
+      const data = await res.json();
+      setUserProfile(data);
+      setHeaderAvatarError(false);
+    } catch (err) {
+      showToast(err.message || "Profil konnte nicht geladen werden", "error");
+    } finally {
+      setProfileLoading(false);
+    }
+  }
+
+  async function handleSaveProfile() {
+    if (!token) return;
+
+    try {
+      setProfileSaving(true);
+
+      const res = await fetch(`${BACKEND_URL}/api/account/me`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          email: profileEmail.trim(),
+          phone: profilePhone.trim(),
+          avatarUrl: profileAvatarUrl.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Profil konnte nicht gespeichert werden");
+      }
+
+      const updated = await res.json();
+      setUserProfile(updated);
+      setHeaderAvatarError(false);
+      showToast("Profil gespeichert");
+      closeProfileModal();
+    } catch (err) {
+      showToast(err.message || "Profil konnte nicht gespeichert werden", "error");
+      setProfileSaving(false);
+    }
+  }
+
+  // ---------------- Tasks ----------------
   async function loadTasks() {
     try {
       setTasksLoading(true);
@@ -166,16 +320,17 @@ function App() {
         return;
       }
       setTasksError(err.message);
+      showToast(err.message || "Tasks konnten nicht geladen werden", "error");
     } finally {
       setTasksLoading(false);
     }
   }
 
-  // ---------------- Initial Load ----------------
   useEffect(() => {
     loadWeather();
     if (token) {
       loadTasks();
+      loadProfile(token);
     }
   }, [token]);
 
@@ -194,21 +349,23 @@ function App() {
         const data = await loginRequest(name, loginPassword);
         localStorage.setItem("token", data.token);
         setToken(data.token);
+        showToast("Login erfolgreich");
       } else {
         await registerRequest(name, loginPassword);
         setAuthMode("login");
+        showToast("Registrierung erfolgreich");
       }
 
       setLoginName("");
       setLoginPassword("");
     } catch (err) {
       setLoginError(err.message);
+      showToast(err.message || "Fehler bei der Anmeldung", "error");
     } finally {
       setLoginLoading(false);
     }
   }
 
-  // ---------------- Task erstellen ----------------
   async function handleAddTask(e) {
     e.preventDefault();
     if (!newTaskTitle.trim()) return;
@@ -222,35 +379,43 @@ function App() {
         priority: newTaskPriority,
       });
 
-      setTasks((prev) => [...prev, created]);
+      setTasks((prev) => [created, ...prev]);
       setNewTaskTitle("");
       setNewTaskDescription("");
       setNewTaskPriority("MEDIUM");
+      showToast("Task erstellt");
     } catch (err) {
       if (err.code === 401) {
         handleLogout();
         return;
       }
       setTasksError(err.message);
+      showToast(err.message || "Task konnte nicht erstellt werden", "error");
     }
   }
 
-  // ---------------- Task löschen ----------------
-  async function handleDeleteTask(id) {
+  async function handleDeleteTaskConfirmed() {
+    if (!taskToDelete) return;
+
     try {
+      setDeleteLoading(true);
       setTasksError(null);
-      await deleteTask(id);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
+
+      await deleteTask(taskToDelete.id);
+      setTasks((prev) => prev.filter((t) => t.id !== taskToDelete.id));
+      showToast("Task gelöscht");
+      closeDeleteDialog();
     } catch (err) {
       if (err.code === 401) {
         handleLogout();
         return;
       }
       setTasksError(err.message);
+      showToast(err.message || "Task konnte nicht gelöscht werden", "error");
+      setDeleteLoading(false);
     }
   }
 
-  // ---------------- Status ändern ----------------
   async function handleStatusChange(id, newStatus) {
     try {
       setTasksError(null);
@@ -261,59 +426,56 @@ function App() {
           task.id === id ? { ...task, status: updated.status } : task
         )
       );
+
+      showToast("Status aktualisiert");
     } catch (err) {
       if (err.code === 401) {
         handleLogout();
         return;
       }
       setTasksError(err.message);
+      showToast(err.message || "Status konnte nicht geändert werden", "error");
     }
   }
 
-  // ---------------- Edit ----------------
-  function startEdit(task) {
-    setEditingTaskId(task.id);
-    setEditTitle(task.title || "");
-    setEditDescription(task.description || "");
-    setEditPriority(task.priority || "MEDIUM");
-  }
+  async function handleSaveEdit() {
+    if (!editingTask || !editTitle.trim()) return;
 
-  function cancelEdit() {
-    setEditingTaskId(null);
-    setEditTitle("");
-    setEditDescription("");
-    setEditPriority("MEDIUM");
-  }
-
-  async function handleSaveEdit(task) {
     try {
+      setEditLoading(true);
       setTasksError(null);
 
-      const updated = await updateTask(task.id, {
-        id: task.id,
+      const updated = await updateTask(editingTask.id, {
+        id: editingTask.id,
         title: editTitle.trim(),
         description: editDescription.trim(),
         priority: editPriority,
-        status: task.status,
+        status: editingTask.status,
       });
 
-      setTasks((prev) => prev.map((t) => (t.id === task.id ? updated : t)));
-      cancelEdit();
+      setTasks((prev) =>
+        prev.map((task) => (task.id === editingTask.id ? updated : task))
+      );
+
+      showToast("Task gespeichert");
+      closeEditModal();
     } catch (err) {
       if (err.code === 401) {
         handleLogout();
         return;
       }
       setTasksError(err.message);
+      showToast(err.message || "Task konnte nicht gespeichert werden", "error");
+      setEditLoading(false);
     }
   }
 
-  // ---------------- Filter / Sort ----------------
+  // ---------------- Derived ----------------
   const filteredAndSortedTasks = useMemo(() => {
     let result = [...tasks];
 
-    if (statusFilter !== "ALL") {
-      result = result.filter((task) => (task.status || "NEW") === statusFilter);
+    if (activeTab !== "ALL") {
+      result = result.filter((task) => (task.status || "NEW") === activeTab);
     }
 
     if (priorityFilter !== "ALL") {
@@ -347,9 +509,8 @@ function App() {
     }
 
     return result;
-  }, [tasks, statusFilter, priorityFilter, sortMode, searchTerm]);
+  }, [tasks, activeTab, priorityFilter, sortMode, searchTerm]);
 
-  // ---------------- KPI ----------------
   const total = tasks.length;
   const totalNew = tasks.filter((t) => (t.status || "NEW") === "NEW").length;
   const totalInProgress = tasks.filter(
@@ -359,18 +520,43 @@ function App() {
   const completionRate =
     total === 0 ? 0 : Math.round((totalDone / total) * 100);
 
+  const showHeaderAvatar = Boolean(
+    userProfile?.avatarUrl && !headerAvatarError
+  );
+  const showModalAvatar = Boolean(profileAvatarUrl && !modalAvatarError);
+
   return (
     <div className="app-shell">
+      <div className="background-orb orb-1" />
+      <div className="background-orb orb-2" />
+      <div className="background-grid" />
+
       <div className="app">
-        {/* Header */}
         <header className="topbar">
           <div className="hero-copy">
-            <span className="hero-badge">Productivity Dashboard</span>
+            <span className="hero-badge">✨ Productivity Dashboard</span>
             <h1>Weather &amp; Task Dashboard</h1>
             <p className="muted hero-text">
-              Organisiere Aufgaben, tracke Prioritäten und behalte das Wetter im
-              Blick.
+              Organisiere Aufgaben, verfolge Fortschritt und behalte das Wetter
+              im Blick.
             </p>
+
+            {token && (
+              <div className="hero-mini-stats">
+                <div className="hero-mini-card">
+                  <span className="hero-mini-label">📋 Tasks</span>
+                  <strong>{total}</strong>
+                </div>
+                <div className="hero-mini-card">
+                  <span className="hero-mini-label">✅ Done</span>
+                  <strong>{totalDone}</strong>
+                </div>
+                <div className="hero-mini-card">
+                  <span className="hero-mini-label">📈 Rate</span>
+                  <strong>{completionRate}%</strong>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="topbar-actions">
@@ -383,20 +569,56 @@ function App() {
               {darkMode ? "☀️ Light" : "🌙 Dark"}
             </button>
 
-            {token ? (
-              <button onClick={handleLogout}>Logout</button>
+            {token && userProfile ? (
+              <>
+                <button
+                  type="button"
+                  className="profile-trigger"
+                  onClick={openProfileModal}
+                >
+                  <div className="profile-avatar-wrap">
+                    {showHeaderAvatar ? (
+                      <img
+                        src={userProfile.avatarUrl}
+                        alt={userProfile.login}
+                        className="profile-avatar"
+                        onError={() => setHeaderAvatarError(true)}
+                      />
+                    ) : (
+                      <div className="profile-avatar profile-avatar-fallback">
+                        {getInitials(userProfile.login)}
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="profile-text">
+                    <span className="profile-name">{userProfile.login}</span>
+                    <span className="profile-subtitle">
+                      {userProfile.email || "Kein E-Mail-Eintrag"}
+                    </span>
+                  </div>
+                </button>
+
+                <button onClick={handleLogout}>🚪 Logout</button>
+              </>
+            ) : token ? (
+              <>
+                <button type="button" className="ghost" disabled>
+                  {profileLoading ? "Profil lädt..." : "Profil"}
+                </button>
+                <button onClick={handleLogout}>🚪 Logout</button>
+              </>
             ) : (
-              <span className="muted auth-state">Nicht eingeloggt</span>
+              <span className="muted auth-state">🔒 Nicht eingeloggt</span>
             )}
           </div>
         </header>
 
-        {/* Login / Register */}
         {!token && (
-          <section className="card auth-card">
+          <section className="card auth-card fade-up">
             <div className="section-head">
               <div>
-                <h2>{authMode === "login" ? "Login" : "Registrieren"}</h2>
+                <h2>{authMode === "login" ? "🔐 Login" : "📝 Registrieren"}</h2>
                 <p className="muted section-subtitle">
                   Melde dich an, um deine Aufgaben zu verwalten.
                 </p>
@@ -409,7 +631,9 @@ function App() {
                   setAuthMode((m) => (m === "login" ? "register" : "login"))
                 }
               >
-                {authMode === "login" ? "Registrieren" : "Zurück zu Login"}
+                {authMode === "login"
+                  ? "📝 Registrieren"
+                  : "⬅️ Zurück zu Login"}
               </button>
             </div>
 
@@ -428,10 +652,10 @@ function App() {
               />
               <button type="submit" disabled={loginLoading}>
                 {loginLoading
-                  ? "Bitte warten..."
+                  ? "⏳ Bitte warten..."
                   : authMode === "login"
-                  ? "Login"
-                  : "Registrieren"}
+                  ? "🔐 Login"
+                  : "📝 Registrieren"}
               </button>
             </form>
 
@@ -439,34 +663,40 @@ function App() {
           </section>
         )}
 
-        {/* KPI */}
         {token && (
           <>
-            <div className="kpi-bar">
-              <div className="kpi-card">
-                <span className="kpi-label">Total Tasks</span>
+            <div className="kpi-bar fade-up">
+              <div className="kpi-card kpi-accent-blue">
+                <span className="kpi-label">📋 Total Tasks</span>
                 <span className="kpi-value">{total}</span>
+                <span className="kpi-foot">Alle vorhandenen Aufgaben</span>
               </div>
+
               <div className="kpi-card kpi-new">
-                <span className="kpi-label">New</span>
+                <span className="kpi-label">🆕 New</span>
                 <span className="kpi-value">{totalNew}</span>
+                <span className="kpi-foot">Noch nicht gestartet</span>
               </div>
+
               <div className="kpi-card kpi-progress">
-                <span className="kpi-label">In Progress</span>
+                <span className="kpi-label">⏳ In Progress</span>
                 <span className="kpi-value">{totalInProgress}</span>
+                <span className="kpi-foot">Aktiv in Bearbeitung</span>
               </div>
+
               <div className="kpi-card kpi-done">
-                <span className="kpi-label">Done</span>
+                <span className="kpi-label">✅ Done</span>
                 <span className="kpi-value">{totalDone}</span>
+                <span className="kpi-foot">Bereits abgeschlossen</span>
               </div>
             </div>
 
-            <section className="card progress-card">
+            <section className="card progress-card fade-up">
               <div className="progress-head">
                 <div>
-                  <h2>Fortschritt</h2>
+                  <h2>📈 Fortschritt</h2>
                   <p className="muted section-subtitle">
-                    {completionRate}% deiner Tasks sind bereits erledigt.
+                    {completionRate}% deiner Tasks sind erledigt.
                   </p>
                 </div>
                 <strong className="progress-percent">{completionRate}%</strong>
@@ -482,13 +712,11 @@ function App() {
           </>
         )}
 
-        {/* Main Grid */}
         <div className="dashboard-grid">
-          {/* Wetter */}
-          <section className="card weather-card">
+          <section className="card weather-card fade-up">
             <div className="section-head">
               <div>
-                <h2>Wetter</h2>
+                <h2>🌤️ Wetter</h2>
                 <p className="muted section-subtitle">
                   Aktuelles Wetter für deine Stadt.
                 </p>
@@ -502,7 +730,7 @@ function App() {
                 onChange={(e) => setCity(e.target.value)}
                 placeholder="Stadt eingeben..."
               />
-              <button onClick={loadWeather}>Wetter laden</button>
+              <button onClick={loadWeather}>🔎 Wetter laden</button>
             </div>
 
             {weatherError && (
@@ -511,6 +739,7 @@ function App() {
 
             {weather && (
               <div className="weather-info">
+                <div className="weather-glow" />
                 <div className="weather-icon-wrap">
                   <img
                     src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`}
@@ -525,15 +754,31 @@ function App() {
 
                 <div className="weather-stats">
                   <div className="mini-stat">
-                    <span className="mini-stat-label">Luftfeuchtigkeit</span>
+                    <span className="mini-stat-label">💧 Luftfeuchtigkeit</span>
                     <span className="mini-stat-value">
                       {weather.main.humidity}%
                     </span>
                   </div>
+
                   <div className="mini-stat">
-                    <span className="mini-stat-label">Wind</span>
+                    <span className="mini-stat-label">🌬️ Wind</span>
                     <span className="mini-stat-value">
                       {Math.round(weather.wind.speed)} m/s
+                    </span>
+                  </div>
+
+                  <div className="mini-stat">
+                    <span className="mini-stat-label">🌡️ Feels Like</span>
+                    <span className="mini-stat-value">
+                      {Math.round(weather.main.feels_like)}°C
+                    </span>
+                  </div>
+
+                  <div className="mini-stat">
+                    <span className="mini-stat-label">📍 Koordinaten</span>
+                    <span className="mini-stat-value">
+                      {weather.coord.lat.toFixed(1)} /{" "}
+                      {weather.coord.lon.toFixed(1)}
                     </span>
                   </div>
                 </div>
@@ -541,11 +786,10 @@ function App() {
             )}
           </section>
 
-          {/* Aufgaben */}
-          <section className="card">
+          <section className="card fade-up">
             <div className="section-head">
               <div>
-                <h2>Aufgaben</h2>
+                <h2>📋 Aufgaben</h2>
                 <p className="muted section-subtitle">
                   Erstelle, filtere und bearbeite deine Tasks.
                 </p>
@@ -554,10 +798,34 @@ function App() {
 
             {!token ? (
               <div className="empty-state">
-                <p className="muted">Bitte einloggen, um Tasks zu sehen.</p>
+                <p className="muted">🔒 Bitte einloggen, um Tasks zu sehen.</p>
               </div>
             ) : (
               <>
+                <div className="quick-actions">
+                  <button
+                    type="button"
+                    className="ghost quick-btn"
+                    onClick={() => fillDemoTask("quick")}
+                  >
+                    ⚡ Quick Task
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost quick-btn"
+                    onClick={() => fillDemoTask("important")}
+                  >
+                    🔥 Important
+                  </button>
+                  <button
+                    type="button"
+                    className="ghost quick-btn"
+                    onClick={() => fillDemoTask("small")}
+                  >
+                    🌱 Small Task
+                  </button>
+                </div>
+
                 <form onSubmit={handleAddTask} className="task-create-grid">
                   <input
                     type="text"
@@ -582,8 +850,41 @@ function App() {
                     <option value="HIGH">High</option>
                   </select>
 
-                  <button type="submit">Hinzufügen</button>
+                  <button type="submit">➕ Hinzufügen</button>
                 </form>
+
+                <div className="tabs">
+                  <button
+                    type="button"
+                    className={activeTab === "ALL" ? "tab active" : "tab"}
+                    onClick={() => setActiveTab("ALL")}
+                  >
+                    📋 All ({getTabCount("ALL")})
+                  </button>
+                  <button
+                    type="button"
+                    className={activeTab === "NEW" ? "tab active" : "tab"}
+                    onClick={() => setActiveTab("NEW")}
+                  >
+                    🆕 New ({getTabCount("NEW")})
+                  </button>
+                  <button
+                    type="button"
+                    className={
+                      activeTab === "IN_PROGRESS" ? "tab active" : "tab"
+                    }
+                    onClick={() => setActiveTab("IN_PROGRESS")}
+                  >
+                    ⏳ In Progress ({getTabCount("IN_PROGRESS")})
+                  </button>
+                  <button
+                    type="button"
+                    className={activeTab === "DONE" ? "tab active" : "tab"}
+                    onClick={() => setActiveTab("DONE")}
+                  >
+                    ✅ Done ({getTabCount("DONE")})
+                  </button>
+                </div>
 
                 <div className="toolbar-grid">
                   <input
@@ -592,16 +893,6 @@ function App() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Task suchen..."
                   />
-
-                  <select
-                    value={statusFilter}
-                    onChange={(e) => setStatusFilter(e.target.value)}
-                  >
-                    <option value="ALL">Alle Status</option>
-                    <option value="NEW">Nur New</option>
-                    <option value="IN_PROGRESS">Nur In Progress</option>
-                    <option value="DONE">Nur Done</option>
-                  </select>
 
                   <select
                     value={priorityFilter}
@@ -628,161 +919,352 @@ function App() {
                     className="ghost"
                     onClick={clearFilters}
                   >
-                    Filter zurücksetzen
+                    ♻️ Zurücksetzen
                   </button>
                 </div>
 
-                {tasksLoading && <p className="muted">Lade Aufgaben...</p>}
                 {tasksError && (
                   <p className="error">Fehler bei Tasks: {tasksError}</p>
                 )}
 
-                {filteredAndSortedTasks.length === 0 && !tasksLoading && (
+                {tasksLoading ? (
+                  <div className="skeleton-list">
+                    {Array.from({ length: 4 }).map((_, index) => (
+                      <div className="skeleton-card" key={index}>
+                        <div className="skeleton skeleton-line skeleton-line-title" />
+                        <div className="skeleton skeleton-line skeleton-line-text" />
+                        <div className="skeleton skeleton-line skeleton-line-text short" />
+                        <div className="skeleton-row">
+                          <div className="skeleton skeleton-pill" />
+                          <div className="skeleton skeleton-pill" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredAndSortedTasks.length === 0 ? (
                   <div className="empty-state">
                     <p className="muted">
-                      Keine Aufgaben für den aktuellen Filter.
+                      📭 Keine Aufgaben für den aktuellen Filter.
                     </p>
                   </div>
-                )}
+                ) : (
+                  <ul className="task-list">
+                    {filteredAndSortedTasks.map((task, index) => {
+                      const status = task.status || "NEW";
+                      const statusColor = getStatusColor(status);
+                      const priority = task.priority || "MEDIUM";
+                      const priorityColor = getPriorityColor(priority);
 
-                <ul className="task-list">
-                  {filteredAndSortedTasks.map((task) => {
-                    const status = task.status || "NEW";
-                    const statusColor = getStatusColor(status);
-                    const priorityColor = getPriorityColor(
-                      task.priority || "MEDIUM"
-                    );
+                      return (
+                        <li
+                          key={task.id}
+                          className="task-item slide-in"
+                          style={{ animationDelay: `${index * 0.05}s` }}
+                        >
+                          <div
+                            className="task-side-line"
+                            style={{ backgroundColor: priorityColor }}
+                          />
 
-                    return (
-                      <li key={task.id} className="task-item">
-                        {editingTaskId === task.id ? (
-                          <>
-                            <div className="task-edit-grid">
-                              <input
-                                type="text"
-                                value={editTitle}
-                                onChange={(e) => setEditTitle(e.target.value)}
-                                placeholder="Titel..."
-                              />
-                              <input
-                                type="text"
-                                value={editDescription}
-                                onChange={(e) =>
-                                  setEditDescription(e.target.value)
-                                }
-                                placeholder="Beschreibung..."
-                              />
-                              <select
-                                value={editPriority}
-                                onChange={(e) =>
-                                  setEditPriority(e.target.value)
-                                }
-                              >
-                                <option value="LOW">Low</option>
-                                <option value="MEDIUM">Medium</option>
-                                <option value="HIGH">High</option>
-                              </select>
-                            </div>
-
-                            <div className="task-actions">
-                              <button onClick={() => handleSaveEdit(task)}>
-                                Speichern
-                              </button>
-                              <button className="ghost" onClick={cancelEdit}>
-                                Abbrechen
-                              </button>
-                            </div>
-                          </>
-                        ) : (
-                          <>
-                            <div className="task-main">
-                              <div className="task-content">
-                                <div className="task-topline">
-                                  <span className="task-title">{task.title}</span>
-
-                                  <span
-                                    className="status-pill"
-                                    style={{
-                                      backgroundColor: `${statusColor}1A`,
-                                      color: statusColor,
-                                      borderColor: statusColor,
-                                      borderStyle: "solid",
-                                      borderWidth: 1,
-                                    }}
-                                  >
-                                    {getStatusLabel(status)}
-                                  </span>
+                          <div className="task-main">
+                            <div className="task-content">
+                              <div className="task-topline">
+                                <div className="task-title-wrap">
+                                  <span className="task-title">📝 {task.title}</span>
+                                  <span className="task-id"># {task.id}</span>
                                 </div>
 
-                                <p className="task-desc">
-                                  {task.description || "Keine Beschreibung"}
-                                </p>
+                                <span
+                                  className="status-pill"
+                                  style={{
+                                    backgroundColor: `${statusColor}18`,
+                                    color: statusColor,
+                                    border: `1px solid ${statusColor}`,
+                                  }}
+                                >
+                                  {status === "DONE"
+                                    ? "✅ Done"
+                                    : status === "IN_PROGRESS"
+                                    ? "⏳ In Progress"
+                                    : "🆕 New"}
+                                </span>
+                              </div>
 
-                                <div className="task-meta">
-                                  <span
-                                    className="priority-badge"
-                                    style={{
-                                      backgroundColor: `${priorityColor}1A`,
-                                      color: priorityColor,
-                                      border: `1px solid ${priorityColor}`,
-                                    }}
-                                  >
-                                    {getPriorityLabel(task.priority || "MEDIUM")}
-                                  </span>
+                              <p className="task-desc">
+                                {task.description || "Keine Beschreibung"}
+                              </p>
 
-                                  <span className="task-id">Task #{task.id}</span>
-                                </div>
+                              <div className="task-meta">
+                                <span
+                                  className="priority-badge"
+                                  style={{
+                                    backgroundColor: `${priorityColor}18`,
+                                    color: priorityColor,
+                                    border: `1px solid ${priorityColor}`,
+                                  }}
+                                >
+                                  {priority === "HIGH"
+                                    ? "🔥 High"
+                                    : priority === "LOW"
+                                    ? "🌱 Low"
+                                    : "⚡ Medium"}
+                                </span>
+
+                                <span className="task-meta-chip">
+                                  {status === "DONE"
+                                    ? "✅ Completed"
+                                    : status === "IN_PROGRESS"
+                                    ? "⚙️ Active"
+                                    : "📌 Planned"}
+                                </span>
                               </div>
                             </div>
+                          </div>
 
-                            <div className="task-actions">
-                              <select
-                                value={status}
-                                onChange={(e) =>
-                                  handleStatusChange(task.id, e.target.value)
-                                }
-                              >
-                                <option value="NEW">New</option>
-                                <option value="IN_PROGRESS">In Progress</option>
-                                <option value="DONE">Done</option>
-                              </select>
+                          <div className="task-actions">
+                            <select
+                              value={status}
+                              onChange={(e) =>
+                                handleStatusChange(task.id, e.target.value)
+                              }
+                            >
+                              <option value="NEW">New</option>
+                              <option value="IN_PROGRESS">In Progress</option>
+                              <option value="DONE">Done</option>
+                            </select>
 
-                              <button
-                                className="ghost"
-                                onClick={() => startEdit(task)}
-                              >
-                                Bearbeiten
-                              </button>
+                            <button
+                              className="ghost"
+                              onClick={() => openEditModal(task)}
+                            >
+                              ✏️ Bearbeiten
+                            </button>
 
-                              <button
-                                className="danger"
-                                onClick={() => handleDeleteTask(task.id)}
-                              >
-                                Löschen
-                              </button>
-                            </div>
-                          </>
-                        )}
-                      </li>
-                    );
-                  })}
-                </ul>
+                            <button
+                              className="danger"
+                              onClick={() => openDeleteDialog(task)}
+                            >
+                              🗑️ Löschen
+                            </button>
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
+                )}
               </>
             )}
           </section>
         </div>
 
-        {/* Footer */}
         <footer className="footer">
           <div className="footer-line">
             <strong>Weather &amp; Task Dashboard</strong>
-            <span>React + Spring Boot</span>
+            <span>⚛️ React + ☕ Spring Boot</span>
+            <span>✨ Modern UI 2026</span>
           </div>
           <p>
-            UI verbessert mit Fokus auf Übersicht, Interaktivität und modernes
-            Layout.
+            Übersichtliches Dashboard mit Wetter, Task-Management, Tabs, Modal,
+            Toasts und Skeleton Loader.
           </p>
         </footer>
+      </div>
+
+      {isEditModalOpen && editingTask && (
+        <div className="overlay" onClick={closeEditModal}>
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-head">
+              <div>
+                <h2>✏️ Task bearbeiten</h2>
+                <p className="muted section-subtitle">
+                  Änderungen für Task #{editingTask.id}
+                </p>
+              </div>
+              <button type="button" className="ghost" onClick={closeEditModal}>
+                ✖️ Schließen
+              </button>
+            </div>
+
+            <div className="modal-body">
+              <input
+                type="text"
+                value={editTitle}
+                onChange={(e) => setEditTitle(e.target.value)}
+                placeholder="Titel..."
+              />
+
+              <input
+                type="text"
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Beschreibung..."
+              />
+
+              <select
+                value={editPriority}
+                onChange={(e) => setEditPriority(e.target.value)}
+              >
+                <option value="LOW">Low</option>
+                <option value="MEDIUM">Medium</option>
+                <option value="HIGH">High</option>
+              </select>
+            </div>
+
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={closeEditModal}>
+                ↩️ Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={editLoading}
+              >
+                {editLoading ? "⏳ Speichern..." : "💾 Speichern"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {taskToDelete && (
+        <div className="overlay" onClick={closeDeleteDialog}>
+          <div className="dialog" onClick={(e) => e.stopPropagation()}>
+            <h2>🗑️ Task löschen?</h2>
+            <p className="muted">
+              Möchtest du <strong>{taskToDelete.title}</strong> wirklich löschen?
+            </p>
+
+            <div className="modal-actions">
+              <button type="button" className="ghost" onClick={closeDeleteDialog}>
+                ↩️ Abbrechen
+              </button>
+              <button
+                type="button"
+                className="danger"
+                onClick={handleDeleteTaskConfirmed}
+                disabled={deleteLoading}
+              >
+                {deleteLoading ? "⏳ Löschen..." : "🗑️ Ja, löschen"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isProfileModalOpen && userProfile && (
+        <div className="overlay" onClick={closeProfileModal}>
+          <div
+            className="modal profile-modal"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="modal-head">
+              <div>
+                <h2>👤 Mein Profil</h2>
+                <p className="muted section-subtitle">
+                  Kontodetails und persönliche Informationen
+                </p>
+              </div>
+              <button
+                type="button"
+                className="ghost"
+                onClick={closeProfileModal}
+              >
+                ✖️ Schließen
+              </button>
+            </div>
+
+            <div className="profile-modal-top">
+              <div className="profile-avatar-large-wrap">
+                {showModalAvatar ? (
+                  <img
+                    src={profileAvatarUrl}
+                    alt={userProfile.login}
+                    className="profile-avatar-large"
+                    onError={() => setModalAvatarError(true)}
+                  />
+                ) : (
+                  <div className="profile-avatar-large profile-avatar-fallback">
+                    {getInitials(userProfile.login)}
+                  </div>
+                )}
+              </div>
+
+              <div className="profile-modal-info">
+                <h3 className="profile-modal-name">{userProfile.login}</h3>
+                <p className="muted">Persönliches Benutzerkonto</p>
+              </div>
+            </div>
+
+            <div className="modal-body">
+              <input type="text" value={userProfile.login} disabled />
+
+              <input
+                type="email"
+                value={profileEmail}
+                onChange={(e) => setProfileEmail(e.target.value)}
+                placeholder="E-Mail-Adresse"
+              />
+
+              <input
+                type="text"
+                value={profilePhone}
+                onChange={(e) => setProfilePhone(e.target.value)}
+                placeholder="Handynummer"
+              />
+
+              <input
+                type="text"
+                value={profileAvatarUrl}
+                onChange={(e) => setProfileAvatarUrl(e.target.value)}
+                placeholder="Avatar URL"
+              />
+            </div>
+
+            <p className="profile-help-text">
+              Für Bilder am besten eine direkte Bild-URL verwenden, zum Beispiel
+              eine `.png`, `.jpg` oder `.webp` Datei.
+            </p>
+
+            <div className="modal-actions">
+              <button
+                type="button"
+                className="ghost"
+                onClick={closeProfileModal}
+              >
+                ↩️ Abbrechen
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveProfile}
+                disabled={profileSaving}
+              >
+                {profileSaving ? "⏳ Speichern..." : "💾 Profil speichern"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="toast-stack">
+        {toasts.map((toast) => (
+          <div
+            key={toast.id}
+            className={`toast ${
+              toast.type === "error"
+                ? "toast-error"
+                : toast.type === "info"
+                ? "toast-info"
+                : "toast-success"
+            }`}
+          >
+            {toast.type === "error"
+              ? "❌ "
+              : toast.type === "info"
+              ? "ℹ️ "
+              : "✅ "}
+            {toast.message}
+          </div>
+        ))}
       </div>
     </div>
   );
