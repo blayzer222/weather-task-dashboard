@@ -16,38 +16,46 @@ import java.util.List;
 @Component
 public class JwtAuthFilter extends OncePerRequestFilter {
 
-  private final JwtService jwt;
+    private final JwtService jwt;
 
-  public JwtAuthFilter(JwtService jwt) {
-    this.jwt = jwt;
-  }
-
-  @Override
-  protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
-      throws ServletException, IOException {
-
-    String auth = request.getHeader("Authorization");
-    if (auth == null || !auth.startsWith("Bearer ")) {
-      chain.doFilter(request, response);
-      return;
+    public JwtAuthFilter(JwtService jwt) {
+        this.jwt = jwt;
     }
 
-    String token = auth.substring("Bearer ".length()).trim();
+    @Override
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
+            throws ServletException, IOException {
 
-    try {
-      String login = jwt.extractLogin(token);
-      var authentication = new UsernamePasswordAuthenticationToken(login, null, List.of());
-      authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
-      SecurityContextHolder.getContext().setAuthentication(authentication);
+        String path = request.getServletPath();
 
-      // AccountId speichern, damit Controller es holen kann:
-      request.setAttribute("accountId", jwt.extractAccountId(token));
+        // Öffentliche Endpoints ohne JWT erlauben
+        if (path.equals("/login") ||
+            path.equals("/register") ||
+            path.equals("/verify-email") ||
+            path.equals("/debug-path")) {
+            chain.doFilter(request, response);
+            return;
+        }
 
-    } catch (Exception e) {
-      // invalid token → unauthenticated
-      SecurityContextHolder.clearContext();
+        String auth = request.getHeader("Authorization");
+        if (auth == null || !auth.startsWith("Bearer ")) {
+            chain.doFilter(request, response);
+            return;
+        }
+
+        String token = auth.substring("Bearer ".length()).trim();
+
+        try {
+            String email = jwt.extractEmail(token);
+            var authentication = new UsernamePasswordAuthenticationToken(email, null, List.of());
+            authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));
+            SecurityContextHolder.getContext().setAuthentication(authentication);
+
+            request.setAttribute("accountId", jwt.extractAccountId(token));
+        } catch (Exception e) {
+            SecurityContextHolder.clearContext();
+        }
+
+        chain.doFilter(request, response);
     }
-
-    chain.doFilter(request, response);
-  }
 }

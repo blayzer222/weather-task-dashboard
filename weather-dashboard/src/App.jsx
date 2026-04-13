@@ -15,11 +15,15 @@ import "./App.css";
 function App() {
   // ---------------- Auth ----------------
   const [token, setToken] = useState(localStorage.getItem("token"));
-  const [loginName, setLoginName] = useState("");
+  const [email, setEmail] = useState("");
   const [loginPassword, setLoginPassword] = useState("");
   const [loginError, setLoginError] = useState(null);
   const [loginLoading, setLoginLoading] = useState(false);
   const [authMode, setAuthMode] = useState("login");
+
+  const [verifyLoading, setVerifyLoading] = useState(false);
+  const [verifyMessage, setVerifyMessage] = useState("");
+  const [verifyError, setVerifyError] = useState("");
 
   // ---------------- Dark Mode ----------------
   const [darkMode, setDarkMode] = useState(
@@ -301,8 +305,46 @@ function App() {
       showToast("Profil gespeichert");
       closeProfileModal();
     } catch (err) {
-      showToast(err.message || "Profil konnte nicht gespeichert werden", "error");
+      showToast(
+        err.message || "Profil konnte nicht gespeichert werden",
+        "error"
+      );
       setProfileSaving(false);
+    }
+  }
+
+  async function handleEmailVerification(tokenFromUrl) {
+    if (!tokenFromUrl) return;
+
+    try {
+      setVerifyLoading(true);
+      setVerifyError("");
+      setVerifyMessage("");
+      setLoginError(null);
+
+      const res = await fetch(
+        `${BACKEND_URL}/verify-email?token=${encodeURIComponent(tokenFromUrl)}`
+      );
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        throw new Error(text || "E-Mail-Verifizierung fehlgeschlagen");
+      }
+
+      setVerifyMessage(text || "E-Mail erfolgreich bestätigt");
+      setAuthMode("login");
+      showToast("E-Mail erfolgreich bestätigt");
+
+      window.history.replaceState({}, document.title, "/");
+    } catch (err) {
+      setVerifyError(err.message || "E-Mail-Verifizierung fehlgeschlagen");
+      showToast(
+        err.message || "E-Mail-Verifizierung fehlgeschlagen",
+        "error"
+      );
+    } finally {
+      setVerifyLoading(false);
     }
   }
 
@@ -334,29 +376,39 @@ function App() {
     }
   }, [token]);
 
+  useEffect(() => {
+    const path = window.location.pathname;
+    const params = new URLSearchParams(window.location.search);
+    const tokenFromUrl = params.get("token");
+
+    if (path === "/verify-email" && tokenFromUrl) {
+      handleEmailVerification(tokenFromUrl);
+    }
+  }, []);
+
   // ---------------- Login / Register ----------------
   async function handleAuth(e) {
     e.preventDefault();
-    if (!loginName.trim() || !loginPassword) return;
+    if (!email.trim() || !loginPassword) return;
 
     try {
       setLoginLoading(true);
       setLoginError(null);
 
-      const name = loginName.trim();
+      const userEmail = email.trim();
 
       if (authMode === "login") {
-        const data = await loginRequest(name, loginPassword);
+        const data = await loginRequest(userEmail, loginPassword);
         localStorage.setItem("token", data.token);
         setToken(data.token);
         showToast("Login erfolgreich");
       } else {
-        await registerRequest(name, loginPassword);
+        await registerRequest(userEmail, loginPassword);
         setAuthMode("login");
-        showToast("Registrierung erfolgreich");
+        showToast("Registrierung erfolgreich. Bitte E-Mail bestätigen.");
       }
 
-      setLoginName("");
+      setEmail("");
       setLoginPassword("");
     } catch (err) {
       setLoginError(err.message);
@@ -639,10 +691,10 @@ function App() {
 
             <form onSubmit={handleAuth} className="row">
               <input
-                type="text"
-                placeholder="Login"
-                value={loginName}
-                onChange={(e) => setLoginName(e.target.value)}
+                type="email"
+                placeholder="E-Mail"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
               />
               <input
                 type="password"
@@ -659,6 +711,9 @@ function App() {
               </button>
             </form>
 
+            {verifyLoading && <p className="muted">E-Mail wird bestätigt...</p>}
+            {verifyMessage && <p className="muted">{verifyMessage}</p>}
+            {verifyError && <p className="error">{verifyError}</p>}
             {loginError && <p className="error">{loginError}</p>}
           </section>
         )}

@@ -2,6 +2,8 @@ package com.example.weathertaskbackend.model;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
+
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -17,6 +19,9 @@ public class Account {
     @Column(nullable = false, unique = true)
     private String login;
 
+    @Column(nullable = true, unique = true)
+    private String email;
+
     @JsonIgnore
     @Column(nullable = false)
     private String password;
@@ -24,8 +29,21 @@ public class Account {
     @Column(nullable = false)
     private String role;
 
-    @Column(name = "email")
-    private String email;
+    // 🔥 NEU
+    @Column(nullable = false)
+    private String nickname;
+
+    // 🔥 NEU
+    @Column(nullable = false)
+    private boolean enabled;
+
+    // 🔥 NEU
+    @Column(nullable = false)
+    private boolean emailVerified;
+
+    // 🔥 NEU (verhindert deine alten DB-Probleme)
+    @Column(name = "time_of_creation", nullable = false)
+    private LocalDateTime timeOfCreation;
 
     @Column(name = "phone")
     private String phone;
@@ -41,6 +59,8 @@ public class Account {
         this.role = "USER";
     }
 
+    // -------- Getter & Setter --------
+
     public Integer getId() {
         return id;
     }
@@ -55,6 +75,14 @@ public class Account {
 
     public void setLogin(String login) {
         this.login = login;
+    }
+
+    public String getEmail() {
+        return email;
+    }
+
+    public void setEmail(String email) {
+        this.email = email;
     }
 
     public String getPassword() {
@@ -73,12 +101,36 @@ public class Account {
         this.role = role;
     }
 
-    public String getEmail() {
-        return email;
+    public String getNickname() {
+        return nickname;
     }
 
-    public void setEmail(String email) {
-        this.email = email;
+    public void setNickname(String nickname) {
+        this.nickname = nickname;
+    }
+
+    public boolean isEnabled() {
+        return enabled;
+    }
+
+    public void setEnabled(boolean enabled) {
+        this.enabled = enabled;
+    }
+
+    public boolean isEmailVerified() {
+        return emailVerified;
+    }
+
+    public void setEmailVerified(boolean emailVerified) {
+        this.emailVerified = emailVerified;
+    }
+
+    public LocalDateTime getTimeOfCreation() {
+        return timeOfCreation;
+    }
+
+    public void setTimeOfCreation(LocalDateTime timeOfCreation) {
+        this.timeOfCreation = timeOfCreation;
     }
 
     public String getPhone() {

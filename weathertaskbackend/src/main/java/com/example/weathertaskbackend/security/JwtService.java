@@ -18,10 +18,10 @@ public class JwtService {
     return Keys.hmacShaKeyFor(SECRET.getBytes(StandardCharsets.UTF_8));
   }
 
-  public String createToken(Integer accountId, String login) {
+  public String createToken(Integer accountId, String email) {
     Instant now = Instant.now();
     return Jwts.builder()
-        .subject(login)
+        .subject(email)
         .claim("accountId", accountId)
         .issuedAt(Date.from(now))
         .expiration(Date.from(now.plusSeconds(60 * 60 * 6))) // 6h
@@ -35,7 +35,7 @@ public class JwtService {
     return (v instanceof Integer i) ? i : Integer.valueOf(v.toString());
   }
 
-  public String extractLogin(String token) {
+  public String extractEmail(String token) {
     return Jwts.parser().verifyWith((javax.crypto.SecretKey) key()).build()
         .parseSignedClaims(token).getPayload().getSubject();
   }

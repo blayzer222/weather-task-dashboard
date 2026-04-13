@@ -16,6 +16,13 @@ services:
       timeout: 5s
       retries: 10
       start_period: 20s
+  
+  mailhog:
+    image: mailhog/mailhog
+    container_name: weather-task-mailhog
+    ports:
+      - "1025:1025"
+      - "8025:8025"
 
   app:
     build: ./weathertaskbackend

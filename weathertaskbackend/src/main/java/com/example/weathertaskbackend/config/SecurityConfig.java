@@ -28,6 +28,7 @@ public class SecurityConfig {
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
             .requestMatchers(HttpMethod.POST, "/register", "/login").permitAll()
             .requestMatchers(HttpMethod.GET, "/debug-path").permitAll()
+            .requestMatchers(HttpMethod.GET, "/verify-email").permitAll()
             .anyRequest().authenticated()
         )
         .exceptionHandling(ex -> ex

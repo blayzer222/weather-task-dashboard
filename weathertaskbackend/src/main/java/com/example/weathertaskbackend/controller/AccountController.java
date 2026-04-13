@@ -21,9 +21,9 @@ public class AccountController {
     @GetMapping("/me")
     public Account getCurrentUser(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.substring(7);
-        String login = jwtService.extractLogin(token);
+        String email = jwtService.extractEmail(token);
 
-        return accountRepository.findByLogin(login)
+        return accountRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
@@ -33,9 +33,9 @@ public class AccountController {
             @RequestBody UpdateProfileRequest request
     ) {
         String token = authHeader.substring(7);
-        String login = jwtService.extractLogin(token);
+        String email = jwtService.extractEmail(token);
 
-        Account account = accountRepository.findByLogin(login)
+        Account account = accountRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         account.setEmail(request.getEmail());
