@@ -1,0 +1,2 @@
+ALTER TABLE tasks
+ADD COLUMN updated_at TIMESTAMP NULL;
