@@ -1262,4 +1262,450 @@ html.dark .skeleton-card {
     top: 14px;
     max-width: none;
   }
+
+  /* =========================
+   Mobile / Tablet Responsive
+   unten in App.css einfügen
+   ========================= */
+
+* {
+  box-sizing: border-box;
+}
+
+img {
+  max-width: 100%;
+}
+
+.app-shell {
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+.app {
+  width: min(1280px, 100%);
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.topbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.topbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.profile-trigger {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  max-width: 100%;
+}
+
+.profile-text {
+  min-width: 0;
+}
+
+.profile-name,
+.profile-subtitle {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.hero-copy {
+  flex: 1 1 500px;
+  min-width: 0;
+}
+
+.hero-mini-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.hero-mini-card {
+  min-width: 110px;
+}
+
+.kpi-bar {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: minmax(280px, 380px) minmax(0, 1fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.row {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.row > * {
+  flex: 1 1 180px;
+  min-width: 0;
+}
+
+.task-create-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 1.4fr 180px 180px;
+  gap: 12px;
+}
+
+.toolbar-grid {
+  display: grid;
+  grid-template-columns: 1.2fr 220px 220px 160px;
+  gap: 12px;
+}
+
+.quick-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.tabs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tab {
+  flex: 0 1 auto;
+}
+
+.task-list {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 0;
+  margin: 0;
+  list-style: none;
+}
+
+.task-item {
+  display: grid;
+  grid-template-columns: 6px minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: stretch;
+}
+
+.task-main,
+.task-content {
+  min-width: 0;
+}
+
+.task-topline {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.task-title-wrap {
+  min-width: 0;
+}
+
+.task-title,
+.task-desc {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.task-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 170px;
+}
+
+.task-actions button,
+.task-actions select {
+  width: 100%;
+}
+
+.weather-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.modal,
+.dialog,
+.profile-modal,
+.auth-card,
+.card {
+  max-width: 100%;
+}
+
+.modal-body {
+  display: grid;
+  gap: 12px;
+}
+
+.modal-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.footer-line {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.toast-stack {
+  position: fixed;
+  right: 16px;
+  bottom: 16px;
+  left: auto;
+  max-width: min(420px, calc(100vw - 32px));
+  z-index: 9999;
+}
+
+.toast {
+  width: 100%;
+  overflow-wrap: anywhere;
+}
+
+/* ---------- Tablet ---------- */
+@media (max-width: 1100px) {
+  .app {
+    padding: 20px;
+  }
+
+  .dashboard-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .kpi-bar {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-create-grid,
+  .toolbar-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .task-actions {
+    min-width: 150px;
+  }
+}
+
+/* ---------- Handy ---------- */
+@media (max-width: 768px) {
+  .app {
+    padding: 14px;
+  }
+
+  .topbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-actions {
+    width: 100%;
+    justify-content: stretch;
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .topbar-actions > button,
+  .topbar-actions > .profile-trigger,
+  .topbar-actions > span {
+    width: 100%;
+  }
+
+  .profile-trigger {
+    justify-content: flex-start;
+  }
+
+  .hero-badge {
+    display: inline-block;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+  }
+
+  h1 {
+    font-size: 2rem;
+    line-height: 1.15;
+  }
+
+  h2 {
+    font-size: 1.25rem;
+  }
+
+  .hero-mini-stats {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .kpi-bar {
+    grid-template-columns: 1fr;
+  }
+
+  .row {
+    flex-direction: column;
+  }
+
+  .row > * {
+    width: 100%;
+    flex: none;
+  }
+
+  .task-create-grid,
+  .toolbar-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .tab {
+    width: 100%;
+  }
+
+  .task-item {
+    grid-template-columns: 6px 1fr;
+  }
+
+  .task-actions {
+    grid-column: 2;
+    min-width: 0;
+    width: 100%;
+  }
+
+  .task-topline {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .weather-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .section-head {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: stretch;
+  }
+
+  .section-head > * {
+    width: 100%;
+  }
+
+  .progress-head {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    align-items: flex-start;
+  }
+
+  .modal,
+  .dialog,
+  .profile-modal {
+    width: min(100%, 100%);
+    max-width: 100%;
+    border-radius: 20px;
+  }
+
+  .overlay {
+    padding: 12px;
+  }
+
+  .modal-actions {
+    flex-direction: column;
+  }
+
+  .modal-actions > button {
+    width: 100%;
+  }
+
+  .profile-modal-top {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    gap: 12px;
+  }
+
+  .footer-line {
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .toast-stack {
+    right: 12px;
+    left: 12px;
+    bottom: 12px;
+    max-width: none;
+  }
+}
+
+/* ---------- Kleine Handys ---------- */
+@media (max-width: 480px) {
+  .app {
+    padding: 10px;
+  }
+
+  h1 {
+    font-size: 1.7rem;
+  }
+
+  h2 {
+    font-size: 1.1rem;
+  }
+
+  .hero-mini-stats {
+    grid-template-columns: 1fr;
+  }
+
+  .tabs {
+    grid-template-columns: 1fr;
+  }
+
+  .card,
+  .auth-card,
+  .modal,
+  .dialog,
+  .profile-modal {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .task-item {
+    gap: 12px;
+  }
+
+  .weather-temp {
+    font-size: 2rem;
+  }
+
+  .profile-avatar-large {
+    width: 84px;
+    height: 84px;
+  }
+}
 }

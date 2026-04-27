@@ -26,9 +26,19 @@ public class SecurityConfig {
         .cors(cors -> cors.configurationSource(corsConfigurationSource))
         .authorizeHttpRequests(auth -> auth
             .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-            .requestMatchers(HttpMethod.POST, "/register", "/login").permitAll()
-            .requestMatchers(HttpMethod.GET, "/debug-path").permitAll()
-            .requestMatchers(HttpMethod.GET, "/verify-email").permitAll()
+
+            .requestMatchers(HttpMethod.POST,
+                "/register",
+                "/login",
+                "/forgot-password",
+                "/reset-password"
+            ).permitAll()
+
+            .requestMatchers(HttpMethod.GET,
+                "/debug-path",
+                "/verify-email"
+            ).permitAll()
+
             .anyRequest().authenticated()
         )
         .exceptionHandling(ex -> ex

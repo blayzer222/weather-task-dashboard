@@ -12,7 +12,6 @@ public class MailService {
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
-    
 
     public MailService(JavaMailSender mailSender) {
         this.mailSender = mailSender;
@@ -29,6 +28,22 @@ public class MailService {
                 "bitte bestätige deine E-Mail-Adresse über diesen Link:\n" +
                 verifyLink + "\n\n" +
                 "Falls du dich nicht registriert hast, kannst du diese Mail ignorieren."
+        );
+
+        mailSender.send(message);
+    }
+
+    public void sendResetPasswordEmail(String toEmail, String token) {
+        String resetLink = frontendUrl + "/reset-password?token=" + token;
+
+        SimpleMailMessage message = new SimpleMailMessage();
+        message.setTo(toEmail);
+        message.setSubject("Passwort zurücksetzen");
+        message.setText(
+                "Hallo,\n\n" +
+                "du kannst dein Passwort über diesen Link zurücksetzen:\n" +
+                resetLink + "\n\n" +
+                "Falls du das nicht warst, kannst du diese Mail ignorieren."
         );
 
         mailSender.send(message);

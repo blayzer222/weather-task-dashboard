@@ -48,10 +48,7 @@ public class AuthController {
         }
 
         if (!acc.isEnabled()) {
-            throw new ResponseStatusException(
-                    HttpStatus.UNAUTHORIZED,
-                    "Please verify your email first"
-            );
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Please verify your email first");
         }
 
         String token = jwt.createToken(acc.getId(), acc.getEmail());
@@ -65,14 +62,15 @@ public class AuthController {
             return ResponseEntity.badRequest().body("email/password required");
         }
 
-        String email = req.email().trim();
+        String email = req.email().trim().toLowerCase();
 
         if (accountRepo.existsByEmail(email)) {
-            return ResponseEntity.status(409).body("email already exists");
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                    .body("email already exists");
         }
 
         Account acc = new Account();
-        acc.setLogin(email); // Übergangslösung, bis login komplett entfernt wird
+        acc.setLogin(email);
         acc.setEmail(email);
         acc.setPassword(encoder.encode(req.password()));
         acc.setNickname("User");
@@ -92,12 +90,12 @@ public class AuthController {
 
         mailService.sendVerificationEmail(acc.getEmail(), verificationToken.getToken());
 
-        return ResponseEntity.status(201).body("registered - please verify your email");
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body("registered - please verify your email");
     }
 
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
-
         VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid token"));
 
@@ -105,7 +103,7 @@ public class AuthController {
             return ResponseEntity.badRequest().body("Token already used");
         }
 
-        if (verificationToken.getExpiresAt().isBefore(java.time.LocalDateTime.now())) {
+        if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
             return ResponseEntity.badRequest().body("Token expired");
         }
 
@@ -119,5 +117,61 @@ public class AuthController {
         verificationTokenRepository.save(verificationToken);
 
         return ResponseEntity.ok("Email verified successfully");
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<?> forgotPassword(@RequestBody LoginRequest req) {
+        if (req.email() == null || req.email().isBlank()) {
+            return ResponseEntity.badRequest().body("email required");
+        }
+
+        String email = req.email().trim().toLowerCase();
+        Account account = accountRepo.findByEmail(email).orElse(null);
+
+        // absichtlich neutrale Antwort, damit man nicht erkennen kann,
+        // ob die E-Mail existiert
+        if (account == null) {
+            return ResponseEntity.ok("If the email exists, a reset link has been sent");
+        }
+
+        VerificationToken resetToken = new VerificationToken();
+        resetToken.setToken(UUID.randomUUID().toString());
+        resetToken.setAccount(account);
+        resetToken.setExpiresAt(LocalDateTime.now().plusMinutes(30));
+        resetToken.setUsed(false);
+
+        verificationTokenRepository.save(resetToken);
+
+        mailService.sendResetPasswordEmail(account.getEmail(), resetToken.getToken());
+
+        return ResponseEntity.ok("If the email exists, a reset link has been sent");
+    }
+
+    @PostMapping("/reset-password")
+    public ResponseEntity<?> resetPassword(@RequestParam String token,
+                                           @RequestParam String newPassword) {
+        if (newPassword == null || newPassword.isBlank()) {
+            return ResponseEntity.badRequest().body("new password required");
+        }
+
+        VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid token"));
+
+        if (verificationToken.isUsed()) {
+            return ResponseEntity.badRequest().body("Token already used");
+        }
+
+        if (verificationToken.getExpiresAt().isBefore(LocalDateTime.now())) {
+            return ResponseEntity.badRequest().body("Token expired");
+        }
+
+        Account account = verificationToken.getAccount();
+        account.setPassword(encoder.encode(newPassword));
+        accountRepo.save(account);
+
+        verificationToken.setUsed(true);
+        verificationTokenRepository.save(verificationToken);
+
+        return ResponseEntity.ok("Password reset successfully");
     }
 }

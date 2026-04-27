@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   fetchTasks,
   createTask,
@@ -24,6 +24,19 @@ function App() {
   const [verifyLoading, setVerifyLoading] = useState(false);
   const [verifyMessage, setVerifyMessage] = useState("");
   const [verifyError, setVerifyError] = useState("");
+
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordMessage, setForgotPasswordMessage] = useState("");
+  const [forgotPasswordError, setForgotPasswordError] = useState("");
+
+  const [resetToken, setResetToken] = useState("");
+  const [resetPassword, setResetPassword] = useState("");
+  const [resetPasswordConfirm, setResetPasswordConfirm] = useState("");
+  const [resetLoading, setResetLoading] = useState(false);
+  const [resetMessage, setResetMessage] = useState("");
+  const [resetError, setResetError] = useState("");
+
+  const verifyRequestedRef = useRef(false);
 
   // ---------------- Dark Mode ----------------
   const [darkMode, setDarkMode] = useState(
@@ -80,6 +93,9 @@ function App() {
 
   const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
   const BACKEND_URL = "http://localhost:8081";
+
+  const pathname = window.location.pathname;
+  const isResetRoute = pathname === "/reset-password";
 
   useEffect(() => {
     if (darkMode) {
@@ -329,6 +345,18 @@ function App() {
       const text = await res.text();
 
       if (!res.ok) {
+        const normalized = (text || "").toLowerCase();
+
+        if (
+          normalized.includes("already used") ||
+          normalized.includes("already verified")
+        ) {
+          setVerifyMessage("E-Mail ist bereits bestätigt.");
+          showToast("E-Mail ist bereits bestätigt", "info");
+          window.history.replaceState({}, document.title, "/");
+          return;
+        }
+
         throw new Error(text || "E-Mail-Verifizierung fehlgeschlagen");
       }
 
@@ -345,6 +373,109 @@ function App() {
       );
     } finally {
       setVerifyLoading(false);
+    }
+  }
+
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setForgotPasswordError("Bitte zuerst eine E-Mail eingeben.");
+      setForgotPasswordMessage("");
+      return;
+    }
+
+    try {
+      setForgotPasswordLoading(true);
+      setForgotPasswordError("");
+      setForgotPasswordMessage("");
+
+      const res = await fetch(`${BACKEND_URL}/forgot-password`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email: email.trim(),
+          password: "",
+        }),
+      });
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        throw new Error(text || "Reset-Link konnte nicht gesendet werden");
+      }
+
+      const message =
+        text || "Wenn die E-Mail existiert, wurde ein Reset-Link gesendet.";
+      setForgotPasswordMessage(message);
+      showToast("Reset-Link wurde angefordert", "info");
+    } catch (err) {
+      setForgotPasswordError(
+        err.message || "Reset-Link konnte nicht gesendet werden"
+      );
+      showToast(
+        err.message || "Reset-Link konnte nicht gesendet werden",
+        "error"
+      );
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  }
+
+  async function handleResetPassword(e) {
+    e.preventDefault();
+
+    if (!resetPassword || !resetPasswordConfirm) {
+      setResetError("Bitte beide Passwort-Felder ausfüllen.");
+      setResetMessage("");
+      return;
+    }
+
+    if (resetPassword !== resetPasswordConfirm) {
+      setResetError("Die Passwörter stimmen nicht überein.");
+      setResetMessage("");
+      return;
+    }
+
+    try {
+      setResetLoading(true);
+      setResetError("");
+      setResetMessage("");
+
+      const res = await fetch(
+        `${BACKEND_URL}/reset-password?token=${encodeURIComponent(
+          resetToken
+        )}&newPassword=${encodeURIComponent(resetPassword)}`,
+        {
+          method: "POST",
+        }
+      );
+
+      const text = await res.text();
+
+      if (!res.ok) {
+        throw new Error(text || "Passwort konnte nicht zurückgesetzt werden");
+      }
+
+      setResetMessage(text || "Passwort erfolgreich zurückgesetzt.");
+      setResetPassword("");
+      setResetPasswordConfirm("");
+      showToast("Passwort erfolgreich zurückgesetzt");
+
+      window.setTimeout(() => {
+        window.history.replaceState({}, document.title, "/");
+        window.location.href = "/";
+      }, 1500);
+    } catch (err) {
+      setResetError(
+        err.message || "Passwort konnte nicht zurückgesetzt werden"
+      );
+      showToast(
+        err.message || "Passwort konnte nicht zurückgesetzt werden",
+        "error"
+      );
+    } finally {
+      setResetLoading(false);
     }
   }
 
@@ -382,7 +513,13 @@ function App() {
     const tokenFromUrl = params.get("token");
 
     if (path === "/verify-email" && tokenFromUrl) {
+      if (verifyRequestedRef.current) return;
+      verifyRequestedRef.current = true;
       handleEmailVerification(tokenFromUrl);
+    }
+
+    if (path === "/reset-password") {
+      setResetToken(tokenFromUrl || "");
     }
   }, []);
 
@@ -666,7 +803,46 @@ function App() {
           </div>
         </header>
 
-        {!token && (
+        {!token && isResetRoute && (
+          <section className="card auth-card fade-up">
+            <div className="section-head">
+              <div>
+                <h2>🔐 Neues Passwort setzen</h2>
+                <p className="muted section-subtitle">
+                  Vergib ein neues Passwort für dein Konto.
+                </p>
+              </div>
+            </div>
+
+            <form onSubmit={handleResetPassword} className="row">
+              <input
+                type="password"
+                placeholder="Neues Passwort"
+                value={resetPassword}
+                onChange={(e) => setResetPassword(e.target.value)}
+              />
+              <input
+                type="password"
+                placeholder="Passwort wiederholen"
+                value={resetPasswordConfirm}
+                onChange={(e) => setResetPasswordConfirm(e.target.value)}
+              />
+              <button type="submit" disabled={resetLoading || !resetToken}>
+                {resetLoading ? "⏳ Bitte warten..." : "🔐 Passwort speichern"}
+              </button>
+            </form>
+
+            {!resetToken && (
+              <p className="error">
+                Kein Reset-Token gefunden. Bitte benutze den Link aus der Mail.
+              </p>
+            )}
+            {resetMessage && <p className="muted">{resetMessage}</p>}
+            {resetError && <p className="error">{resetError}</p>}
+          </section>
+        )}
+
+        {!token && !isResetRoute && (
           <section className="card auth-card fade-up">
             <div className="section-head">
               <div>
@@ -679,9 +855,12 @@ function App() {
               <button
                 type="button"
                 className="ghost"
-                onClick={() =>
-                  setAuthMode((m) => (m === "login" ? "register" : "login"))
-                }
+                onClick={() => {
+                  setAuthMode((m) => (m === "login" ? "register" : "login"));
+                  setLoginError(null);
+                  setForgotPasswordError("");
+                  setForgotPasswordMessage("");
+                }}
               >
                 {authMode === "login"
                   ? "📝 Registrieren"
@@ -711,9 +890,32 @@ function App() {
               </button>
             </form>
 
+            {authMode === "login" && (
+              <div style={{ marginTop: "12px" }}>
+                <button
+                  type="button"
+                  className="ghost"
+                  onClick={handleForgotPassword}
+                  disabled={forgotPasswordLoading}
+                >
+                  {forgotPasswordLoading
+                    ? "⏳ Link wird gesendet..."
+                    : "🔑 Passwort vergessen?"}
+                </button>
+              </div>
+            )}
+
             {verifyLoading && <p className="muted">E-Mail wird bestätigt...</p>}
             {verifyMessage && <p className="muted">{verifyMessage}</p>}
             {verifyError && <p className="error">{verifyError}</p>}
+
+            {forgotPasswordMessage && (
+              <p className="muted">{forgotPasswordMessage}</p>
+            )}
+            {forgotPasswordError && (
+              <p className="error">{forgotPasswordError}</p>
+            )}
+
             {loginError && <p className="error">{loginError}</p>}
           </section>
         )}
@@ -1025,7 +1227,9 @@ function App() {
                             <div className="task-content">
                               <div className="task-topline">
                                 <div className="task-title-wrap">
-                                  <span className="task-title">📝 {task.title}</span>
+                                  <span className="task-title">
+                                    📝 {task.title}
+                                  </span>
                                   <span className="task-id"># {task.id}</span>
                                 </div>
 
@@ -1190,7 +1394,11 @@ function App() {
             </p>
 
             <div className="modal-actions">
-              <button type="button" className="ghost" onClick={closeDeleteDialog}>
+              <button
+                type="button"
+                className="ghost"
+                onClick={closeDeleteDialog}
+              >
                 ↩️ Abbrechen
               </button>
               <button
