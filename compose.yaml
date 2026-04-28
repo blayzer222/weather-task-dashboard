@@ -40,6 +40,7 @@ services:
       SPRING_JPA_HIBERNATE_DDL_AUTO: validate
       SPRING_FLYWAY_ENABLED: "true"
       SPRING_FLYWAY_LOCATIONS: classpath:db/migration
+      OPENWEATHER_API_KEY: ${OPENWEATHER_API_KEY}
 
   frontend:
     build: ./weather-dashboard
