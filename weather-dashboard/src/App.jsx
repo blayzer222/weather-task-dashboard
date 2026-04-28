@@ -996,45 +996,29 @@ function App() {
             {weather && (
               <div className="weather-info">
                 <div className="weather-glow" />
+
                 <div className="weather-icon-wrap">
-                  <img
-                    src={`https://openweathermap.org/img/wn/${weather.weather[0].icon}@2x.png`}
-                    alt={weather.weather[0].description}
-                    className="weather-icon"
-                  />
+                  <div className="weather-icon">🌤️</div>
                 </div>
 
-                <h3>{weather.name}</h3>
-                <p className="weather-temp">{Math.round(weather.main.temp)}°C</p>
-                <p className="weather-desc">{weather.weather[0].description}</p>
+                <h3>{weather.city}</h3>
+                <p className="weather-temp">
+                  {Math.round(weather.temperature)}°C
+                </p>
+                <p className="weather-desc">{weather.description}</p>
 
                 <div className="weather-stats">
                   <div className="mini-stat">
                     <span className="mini-stat-label">💧 Luftfeuchtigkeit</span>
                     <span className="mini-stat-value">
-                      {weather.main.humidity}%
+                      {weather.humidity}%
                     </span>
                   </div>
 
                   <div className="mini-stat">
                     <span className="mini-stat-label">🌬️ Wind</span>
                     <span className="mini-stat-value">
-                      {Math.round(weather.wind.speed)} m/s
-                    </span>
-                  </div>
-
-                  <div className="mini-stat">
-                    <span className="mini-stat-label">🌡️ Feels Like</span>
-                    <span className="mini-stat-value">
-                      {Math.round(weather.main.feels_like)}°C
-                    </span>
-                  </div>
-
-                  <div className="mini-stat">
-                    <span className="mini-stat-label">📍 Koordinaten</span>
-                    <span className="mini-stat-value">
-                      {weather.coord.lat.toFixed(1)} /{" "}
-                      {weather.coord.lon.toFixed(1)}
+                      {Math.round(weather.windSpeed)} m/s
                     </span>
                   </div>
                 </div>

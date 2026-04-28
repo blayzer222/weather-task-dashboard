@@ -25,4 +25,3 @@ yarn-error.log*
 # env files (WICHTIG)
 .env
 *.env
-weather-dashboard/.env
