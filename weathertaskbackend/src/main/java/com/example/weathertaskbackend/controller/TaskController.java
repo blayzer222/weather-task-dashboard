@@ -1,5 +1,7 @@
 package com.example.weathertaskbackend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import com.example.weathertaskbackend.dto.TaskDto;
 import com.example.weathertaskbackend.model.Account;
 import com.example.weathertaskbackend.model.Task;
@@ -12,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.List;
 
+@Tag(name = "Tasks", description = "Task management endpoints")
 @RestController
 @RequestMapping("/api/tasks")
 public class TaskController {
@@ -38,12 +41,14 @@ public class TaskController {
     );
   }
 
+  @Operation(summary = "Get all tasks", description = "Returns all tasks of the authenticated user")
   @GetMapping
   public List<TaskDto> getTasks(HttpServletRequest req) {
     Integer accountId = accountId(req);
     return taskRepo.findByAccountId(accountId).stream().map(TaskController::toDto).toList();
   }
 
+  @Operation(summary = "Create task", description = "Creates a new task")
   @PostMapping
   public TaskDto addTask(HttpServletRequest req, @RequestBody TaskDto body) {
     Integer accountId = accountId(req);
@@ -63,6 +68,7 @@ public class TaskController {
     return toDto(taskRepo.save(t));
   }
 
+  @Operation(summary = "Update task", description = "Updates title, description and priority")
   @PutMapping("/{taskId}")
   public TaskDto updateTask(
       HttpServletRequest req,
@@ -88,6 +94,7 @@ public class TaskController {
     return toDto(taskRepo.save(t));
   }
 
+  @Operation(summary = "Update task status", description = "Updates only the status of a task")
   @PutMapping("/{taskId}/status")
   public TaskDto updateStatus(
       HttpServletRequest req,
@@ -105,6 +112,7 @@ public class TaskController {
     return toDto(taskRepo.save(t));
   }
 
+  @Operation(summary = "Delete task", description = "Deletes a task by ID")
   @DeleteMapping("/{taskId}")
   public void deleteTask(HttpServletRequest req, @PathVariable Integer taskId) {
     Integer accountId = accountId(req);

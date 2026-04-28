@@ -1,11 +1,14 @@
 package com.example.weathertaskbackend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import com.example.weathertaskbackend.dto.UpdateProfileRequest;
 import com.example.weathertaskbackend.model.Account;
 import com.example.weathertaskbackend.repository.AccountRepository;
 import com.example.weathertaskbackend.security.JwtService;
 import org.springframework.web.bind.annotation.*;
 
+@Tag(name = "Account", description = "Endpoints for user profile management")
 @RestController
 @RequestMapping("/api/account")
 public class AccountController {
@@ -18,6 +21,7 @@ public class AccountController {
         this.jwtService = jwtService;
     }
 
+    @Operation(summary = "Get current user", description = "Returns the currently authenticated user profile")
     @GetMapping("/me")
     public Account getCurrentUser(@RequestHeader("Authorization") String authHeader) {
         String token = authHeader.substring(7);
@@ -27,6 +31,7 @@ public class AccountController {
                 .orElseThrow(() -> new RuntimeException("User not found"));
     }
 
+     @Operation(summary = "Update current user", description = "Updates email, phone and avatar of the current user")
     @PutMapping("/me")
     public Account updateCurrentUser(
             @RequestHeader("Authorization") String authHeader,

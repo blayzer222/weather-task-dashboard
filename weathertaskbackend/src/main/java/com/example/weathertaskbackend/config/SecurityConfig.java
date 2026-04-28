@@ -36,7 +36,8 @@ public class SecurityConfig {
 
             .requestMatchers(HttpMethod.GET,
                 "/debug-path",
-                "/verify-email"
+                "/verify-email",
+                "/api/weather"
             ).permitAll()
 
             .requestMatchers(

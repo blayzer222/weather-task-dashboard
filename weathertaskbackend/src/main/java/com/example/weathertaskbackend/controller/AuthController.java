@@ -1,5 +1,7 @@
 package com.example.weathertaskbackend.controller;
 
+import io.swagger.v3.oas.annotations.tags.Tag;
+import io.swagger.v3.oas.annotations.Operation;
 import com.example.weathertaskbackend.dto.LoginRequest;
 import com.example.weathertaskbackend.dto.LoginResponse;
 import com.example.weathertaskbackend.model.Account;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.UUID;
 
+@Tag(name = "Authentication", description = "Authentication and account management")
 @RestController
 public class AuthController {
 
@@ -38,6 +41,7 @@ public class AuthController {
         this.mailService = mailService;
     }
 
+    @Operation(summary = "Login", description = "Authenticate user and return JWT token")
     @PostMapping("/login")
     public LoginResponse login(@RequestBody LoginRequest req) {
         Account acc = accountRepo.findByEmail(req.email())
@@ -55,6 +59,7 @@ public class AuthController {
         return new LoginResponse(token);
     }
 
+    @Operation(summary = "Register", description = "Register a new user and send verification email")
     @PostMapping("/register")
     public ResponseEntity<?> register(@RequestBody LoginRequest req) {
         if (req.email() == null || req.email().isBlank() ||
@@ -94,6 +99,7 @@ public class AuthController {
                 .body("registered - please verify your email");
     }
 
+    @Operation(summary = "Verify email", description = "Verify user email using token")
     @GetMapping("/verify-email")
     public ResponseEntity<?> verifyEmail(@RequestParam String token) {
         VerificationToken verificationToken = verificationTokenRepository.findByToken(token)
@@ -119,6 +125,7 @@ public class AuthController {
         return ResponseEntity.ok("Email verified successfully");
     }
 
+    @Operation(summary = "Forgot password", description = "Send password reset email")
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody LoginRequest req) {
         if (req.email() == null || req.email().isBlank()) {
@@ -147,6 +154,7 @@ public class AuthController {
         return ResponseEntity.ok("If the email exists, a reset link has been sent");
     }
 
+    @Operation(summary = "Reset password", description = "Reset password using token")
     @PostMapping("/reset-password")
     public ResponseEntity<?> resetPassword(@RequestParam String token,
                                            @RequestParam String newPassword) {

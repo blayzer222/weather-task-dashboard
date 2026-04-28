@@ -91,7 +91,6 @@ function App() {
   // ---------------- Toasts ----------------
   const [toasts, setToasts] = useState([]);
 
-  const API_KEY = import.meta.env.VITE_WEATHER_API_KEY;
   const BACKEND_URL = "http://localhost:8081";
 
   const pathname = window.location.pathname;
@@ -250,7 +249,7 @@ function App() {
       setWeatherError(null);
 
       const res = await fetch(
-        `https://api.openweathermap.org/data/2.5/weather?q=${city}&appid=${API_KEY}&units=metric&lang=de`
+        `http://localhost:8081/api/weather?city=${city}`
       );
 
       if (!res.ok) {

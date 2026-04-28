@@ -1,39 +1,43 @@
 package com.example.weathertaskbackend.controller;
 
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.web.bind.annotation.*;
+import org.springframework.web.client.RestTemplate;
 
 import java.util.Map;
 
-/*
- * Einfacher REST-Controller für Wetterdaten.
- * Dieser dient als "interne API", die das Frontend abrufen kann.
- *
- * In dieser Version sind die Werte statisch, also fest im Code definiert.
- * Später könnte dieser Controller echte Daten aus OpenWeatherMap holen.
- */
+@Tag(name = "Weather", description = "Weather data from OpenWeather API")
 @RestController
+@RequestMapping("/api/weather")
 public class WeatherController {
 
-    /*
-     * GET /api/weather
-     * Gibt ein kleines JSON-Objekt mit Beispiel-Wetterdaten zurück.
-     *
-     * Rückgabewert:
-     *  {
-     *      "city": "Berlin",
-     *      "temperature": 12,
-     *      "description": "Leicht bewölkt"
-     *  }
-     *
-     * Map.of(...) wird genutzt, um ein kleines unveränderliches JSON zu erstellen.
-     */
-    @GetMapping("/api/weather")
-    public Map<String, Object> getWeather() {
+    @Value("${openweather.api.key}")
+    private String apiKey;
+
+    private final RestTemplate restTemplate = new RestTemplate();
+
+    @Operation(
+            summary = "Get weather by city",
+            description = "Returns current weather data for a given city using OpenWeather API"
+    )
+    @GetMapping
+    public Map<String, Object> getWeather(@RequestParam(defaultValue = "Berlin") String city) {
+        String url = "https://api.openweathermap.org/data/2.5/weather"
+                + "?q=" + city
+                + "&appid=" + apiKey
+                + "&units=metric"
+                + "&lang=de";
+
+        Map response = restTemplate.getForObject(url, Map.class);
+
         return Map.of(
-                "city", "Berlin",
-                "temperature", 12,
-                "description", "Leicht bewölkt"
+                "city", response.get("name"),
+                "temperature", ((Map<?, ?>) response.get("main")).get("temp"),
+                "description", ((Map<?, ?>) ((java.util.List<?>) response.get("weather")).get(0)).get("description"),
+                "humidity", ((Map<?, ?>) response.get("main")).get("humidity"),
+                "windSpeed", ((Map<?, ?>) response.get("wind")).get("speed")
         );
     }
 }
