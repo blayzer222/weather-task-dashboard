@@ -257,6 +257,9 @@ function App() {
       }
 
       const data = await res.json();
+
+      console.log("WEATHER DATA:", data); 
+      
       setWeather(data);
     } catch (err) {
       setWeather(null);
@@ -998,7 +1001,13 @@ function App() {
                 <div className="weather-glow" />
 
                 <div className="weather-icon-wrap">
-                  <div className="weather-icon">🌤️</div>
+                  {weather?.icon && (
+                    <img
+                      src={`https://openweathermap.org/img/wn/${weather.icon}@4x.png`}
+                      alt="weather"
+                      className="weather-icon"
+                    />
+                  )}
                 </div>
 
                 <h3>{weather.city}</h3>

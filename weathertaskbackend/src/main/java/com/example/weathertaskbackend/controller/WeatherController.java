@@ -23,7 +23,8 @@ public class WeatherController {
             description = "Returns current weather data for a given city using OpenWeather API"
     )
     @GetMapping
-    public Map<String, Object> getWeather(@RequestParam(defaultValue = "Berlin") String city) {
+        public Map<String, Object> getWeather(@RequestParam(defaultValue = "Berlin") String city) {
+
         String url = "https://api.openweathermap.org/data/2.5/weather"
                 + "?q=" + city
                 + "&appid=" + apiKey
@@ -32,12 +33,19 @@ public class WeatherController {
 
         Map response = restTemplate.getForObject(url, Map.class);
 
+        // 🔹 Daten sauber extrahieren
+        Map<?, ?> main = (Map<?, ?>) response.get("main");
+        Map<?, ?> wind = (Map<?, ?>) response.get("wind");
+        Map<?, ?> weather = (Map<?, ?>) ((java.util.List<?>) response.get("weather")).get(0);
+
+        // 🔹 Saubere Antwort zurückgeben
         return Map.of(
                 "city", response.get("name"),
-                "temperature", ((Map<?, ?>) response.get("main")).get("temp"),
-                "description", ((Map<?, ?>) ((java.util.List<?>) response.get("weather")).get(0)).get("description"),
-                "humidity", ((Map<?, ?>) response.get("main")).get("humidity"),
-                "windSpeed", ((Map<?, ?>) response.get("wind")).get("speed")
+                "temperature", main.get("temp"),
+                "description", weather.get("description"),
+                "humidity", main.get("humidity"),
+                "windSpeed", wind.get("speed"),
+                "icon", weather.get("icon")   // 🔥 WICHTIG
         );
-    }
+        }
 }
